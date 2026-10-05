@@ -3,6 +3,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ImportBackup from "./import-backup";
 import Goals from "./goals";
+import Training, { TrainingToday, type TrainingView } from "./training";
+import FocusAlarm from "./focus-alarm";
 import {
   WorkTracker,
   DailyValues,
@@ -60,7 +62,7 @@ import type {
 } from "@/lib/model";
 import { localClock, shiftDate } from "@/lib/time";
 type Save = (command: Command) => Promise<boolean>;
-type Tab = "today" | "tasks" | "goals" | "history" | "settings";
+type Tab = "today" | "tasks" | "goals" | "training" | "history" | "settings";
 const Feedback = createContext("");
 
 function Modal({
@@ -146,6 +148,7 @@ export default function Home({
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
   const [now, setNow] = useState(new Date());
+  const [trainingView, setTrainingView] = useState<TrainingView>("manage");
   const timeOffset = useRef(0);
   const [checkinOpen, setCheckinOpen] = useState(false);
   const [dayOpen, setDayOpen] = useState(false);
@@ -363,20 +366,26 @@ export default function Home({
                 { id: "today", label: "Heute", icon: HomeIcon },
                 { id: "tasks", label: "Aufgaben", icon: LayoutList },
                 { id: "goals", label: "Ziele", icon: Flag },
+                { id: "training", label: "Training", icon: Footprints },
                 { id: "settings", label: "Einstellungen", icon: SettingsIcon },
               ] as const
-            ).map((item) => (
-              <button
-                key={item.id}
-                className={tab === item.id ? "nav-item active" : "nav-item"}
-                onClick={() => navigate(item.id)}
-                aria-current={tab === item.id ? "page" : undefined}
-              >
-                <item.icon size={19} />
-                {item.label}
-                {item.id === "today" && <span className="nav-dot" />}
-              </button>
-            ))}
+            )
+              .filter(
+                (item) =>
+                  item.id !== "training" || preferences(s).training_enabled,
+              )
+              .map((item) => (
+                <button
+                  key={item.id}
+                  className={tab === item.id ? "nav-item active" : "nav-item"}
+                  onClick={() => navigate(item.id)}
+                  aria-current={tab === item.id ? "page" : undefined}
+                >
+                  <item.icon size={19} />
+                  {item.label}
+                  {item.id === "today" && <span className="nav-dot" />}
+                </button>
+              ))}
           </nav>
           <div className="sidebar-note">
             <span className="little-line" />
@@ -440,6 +449,7 @@ export default function Home({
                     today: "Heute",
                     tasks: "Aufgaben",
                     goals: "Ziele",
+                    training: "Training",
                     history: "Rückblick",
                     settings: "Einstellungen",
                   }[tab]
@@ -494,6 +504,11 @@ export default function Home({
               </button>
             </div>
           )}
+          <FocusAlarm
+            state={s}
+            now={now}
+            refresh={() => load(data.date, true)}
+          />
           <div className="page-heading">
             <div>
               <div className="eyebrow">
@@ -509,6 +524,7 @@ export default function Home({
                   {
                     tasks: "Platz für das Wichtige.",
                     goals: "Eine Richtung, die dir wichtig ist.",
+                    training: "Dein Training. Dein Aufbau.",
                     history: "Ein Blick zurück.",
                     settings: "Dein eigener Rhythmus.",
                   }[tab as Exclude<Tab, "today">]
@@ -656,45 +672,60 @@ export default function Home({
                   </button>
                 </section>
                 <FocusGoals state={s} />
-                <section className="card training-card">
-                  <div className="training-icon">
-                    <Footprints size={22} />
-                  </div>
-                  <div>
-                    <span className="eyebrow">TRAINING HEUTE</span>
-                    <h3>{plan.training_note || "Raum für Bewegung."}</h3>
-                    <p className="muted">
-                      {plan.training_time
-                        ? `${plan.training_time} Uhr · Tagesnotiz`
-                        : "Optional: Was hast du heute vor?"}
-                    </p>
-                  </div>
-                  <button
-                    className="icon-button"
-                    aria-label="Trainingsnotiz bearbeiten"
-                    onClick={() => setDayOpen(true)}
-                  >
-                    <ArrowUpRight size={20} />
-                  </button>
-                  <label>
-                    Training-Status
-                    <select
-                      disabled={busy}
-                      value={plan.training_status || "open"}
-                      onChange={(e) =>
-                        save({
-                          type: "training-status",
-                          date: data.date,
-                          status: e.target.value as "open" | "planned" | "done",
-                        })
-                      }
-                    >
-                      <option value="open">offen</option>
-                      <option value="planned">geplant</option>
-                      <option value="done">erledigt</option>
-                    </select>
-                  </label>
-                </section>
+                {preferences(s).training_enabled && (
+                  <>
+                    <TrainingToday
+                      state={s}
+                      date={data.date}
+                      save={save}
+                      busy={busy}
+                      open={(view = "manage") => {
+                        setTrainingView(view);
+                        navigate("training");
+                      }}
+                    />
+                    <section className="card training-card">
+                      <div className="training-icon">
+                        <Footprints size={22} />
+                      </div>
+                      <div>
+                        <span className="eyebrow">TRAINING HEUTE</span>
+                        <h3>{plan.training_note || "Raum für Bewegung."}</h3>
+                        <p className="muted">
+                          {plan.training_time
+                            ? `${plan.training_time} Uhr · Tagesnotiz`
+                            : "Optional: Was hast du heute vor?"}
+                        </p>
+                      </div>
+                      <button
+                        className="icon-button"
+                        aria-label="Trainingsnotiz bearbeiten"
+                        onClick={() => setDayOpen(true)}
+                      >
+                        <ArrowUpRight size={20} />
+                      </button>
+                      <label>
+                        Training-Status
+                        <select
+                          disabled={busy}
+                          value={plan.training_status || "open"}
+                          onChange={(e) =>
+                            save({
+                              type: "training-status",
+                              date: data.date,
+                              status: e.target.value as
+                                "open" | "planned" | "done",
+                            })
+                          }
+                        >
+                          <option value="open">offen</option>
+                          <option value="planned">geplant</option>
+                          <option value="done">erledigt</option>
+                        </select>
+                      </label>
+                    </section>
+                  </>
+                )}
                 <WorkTracker
                   state={s}
                   date={data.date}
@@ -900,6 +931,36 @@ export default function Home({
               }}
             />
           )}
+          {tab === "training" &&
+            (preferences(s).training_enabled ? (
+              <Training
+                initialView={trainingView}
+                state={s}
+                date={data.date}
+                save={save}
+                busy={busy}
+                onDirty={() => {
+                  dirty.current = true;
+                }}
+                discard={() => {
+                  if (
+                    dirty.current &&
+                    !window.confirm("Ungespeicherte Eingaben verwerfen?")
+                  )
+                    return false;
+                  dirty.current = false;
+                  return true;
+                }}
+              />
+            ) : (
+              <section className="card">
+                <h2>Training ausgeblendet</h2>
+                <p>
+                  Du kannst das Modul in den Einstellungen wieder einschalten.
+                  Deine Daten bleiben gespeichert.
+                </p>
+              </section>
+            ))}
           {tab === "goals" && (
             <Goals
               state={s}
@@ -1647,6 +1708,12 @@ function SettingsForm({
       movement_time: String(f.get("movement")),
       checkin_time: String(f.get("checkin")),
       preferences: {
+        ...preferences(state),
+        training_enabled: f.has("training_enabled"),
+        alarm_enabled: f.has("alarm_enabled"),
+        alarm_tone: String(f.get("alarm_tone")) as
+          "bell" | "digital" | "soft" | "alert",
+        alarm_volume: Number(f.get("alarm_volume")),
         wake_weekday: String(f.get("wake_weekday")),
         wake_weekend: String(f.get("wake_weekend")),
         coffee_cutoff: String(f.get("coffee_cutoff")),

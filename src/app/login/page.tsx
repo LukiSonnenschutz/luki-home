@@ -67,7 +67,7 @@ export default function Login() {
           </h1>
           <p>Ein ruhiger Ort für das, was heute wichtig ist.</p>
         </div>
-        <span className="muted">LUKI HOME · VERSION 0.2.0</span>
+        <span className="muted">LUKI HOME · VERSION 0.3.0</span>
       </div>
       <section className="login-panel">
         <div className="sun-badge">

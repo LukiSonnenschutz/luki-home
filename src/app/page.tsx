@@ -11,6 +11,7 @@ export default async function Page({
   const view = (await searchParams).view;
   const tab =
     view === "goals" ||
+    view === "training" ||
     view === "tasks" ||
     view === "settings" ||
     view === "history"

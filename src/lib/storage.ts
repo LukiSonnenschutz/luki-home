@@ -21,7 +21,7 @@ export async function readState(userId: string): Promise<State> {
     return (await import("./db")).readState(userId);
   const { data, error } = await (
     await supabase()
-  ).rpc("luki_home_get_state_v2");
+  ).rpc("luki_home_get_state_v3");
   if (error) cloudError(error);
   const state = data as State;
   if (!state || state.profile.user_id !== userId)
@@ -43,7 +43,7 @@ export async function updateState<T>(
     if (JSON.stringify(state) === before) return { state, result };
     const { error } = await (
       await supabase()
-    ).rpc("luki_home_save_state_v2", { p_state: state, p_revision: revision });
+    ).rpc("luki_home_save_state_v3", { p_state: state, p_revision: revision });
     if (error) {
       if (error.code === "40001" && retryRead && attempt < 2) continue;
       cloudError(error);
