@@ -415,8 +415,11 @@ test("0.3: realer 15-Sekunden-Fokusblock mit Pause, Reload, Ablaufmeldung und Au
   ).toBeVisible();
   await save(page, "Einstellungen speichern");
   await page.getByRole("button", { name: "Heute", exact: true }).click();
+  await page.getByLabel("Fokusdauer · Minuten", { exact: true }).fill("0.5");
   await save(page, "Fokusblock starten");
   await save(page, "Fokus pausieren");
+  await page.getByLabel("Fokusdauer · Minuten", { exact: true }).fill("0.25");
+  await save(page, "Zeit übernehmen");
   await page.reload();
   await expect(
     page.getByRole("button", { name: "Fokus fortsetzen", exact: true }),
