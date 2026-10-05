@@ -222,7 +222,9 @@ export const commandSchema = z.discriminatedUnion("type", [
       "break-start",
       "break-end",
       "reset",
+      "set-duration",
     ]),
+    minutes: z.number().finite().min(0.1).max(240).optional(),
   }),
   z.object({
     type: z.literal("training-status"),

@@ -394,6 +394,41 @@ test("15-Sekunden-Timer: Pause, Reload, Fortsetzen, Ablauf nach Suspend und Rese
   const legacy = { ...w, planned_seconds: undefined };
   assert.equal(plannedSeconds(legacy), legacy.planned_minutes * 60);
 });
+test("Fokusdauer je Block und bei Pause ändern erhält Fokuszeit und Standarddauer", () => {
+  const s = newState(uid);
+  const standard = preferences(s).focus_minutes;
+  run(s, { type: "work", date, action: "start", minutes: 25 });
+  const w = s.work_sessions[0];
+  assert.equal(plannedSeconds(w), 1500);
+  run(
+    s,
+    { type: "work", date, action: "pause" },
+    new Date(now.getTime() + 10000),
+  );
+  run(
+    s,
+    { type: "work", date, action: "set-duration", minutes: 45 },
+    new Date(now.getTime() + 20000),
+  );
+  assert.equal(plannedSeconds(w), 2700);
+  assert.equal(w.status, "paused");
+  assert.equal(focusSeconds(w, new Date(now.getTime() + 30000)), 10);
+  assert.equal(preferences(s).focus_minutes, standard);
+  assert.throws(
+    () => run(s, { type: "work", date, action: "set-duration", minutes: 0.1 }),
+    /Gesamtdauer/,
+  );
+  assert.throws(
+    () => run(s, { type: "work", date, action: "set-duration" }),
+    /Fokusdauer/,
+  );
+  for (const minutes of [0, 241, Infinity])
+    assert.equal(
+      commandSchema.safeParse({ type: "work", date, action: "start", minutes })
+        .success,
+      false,
+    );
+});
 test("Vier eigene Signaltöne erzeugen unterschiedliche endliche Audiosignale und respektieren Lautstärke", () => {
   const signals = alarmTones.map((t) => toneSamples(t, 0.5, 8000));
   for (const signal of signals) {

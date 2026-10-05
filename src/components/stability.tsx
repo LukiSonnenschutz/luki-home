@@ -72,16 +72,48 @@ export function WorkTracker({ state: s, date, now, save, busy }: Props) {
             : preferences(s).focus_minutes}{" "}
         Minuten geplant
       </p>
-      <div className="button-row">
-        {!current && (
-          <button
-            disabled={busy || !today}
-            className="primary"
-            onClick={() => action("start")}
-          >
-            Fokusblock starten
+      {!inBreak && (
+        <form
+          key={current?.id || "new-focus"}
+          onSubmit={async (event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            await save({
+              type: "work",
+              date,
+              action: current ? "set-duration" : "start",
+              minutes: Number(form.get("minutes")),
+            });
+          }}
+        >
+          <label>
+            Fokusdauer · Minuten
+            <input
+              name="minutes"
+              type="number"
+              min="0.1"
+              max="240"
+              step="any"
+              required
+              disabled={busy || !today}
+              defaultValue={
+                current
+                  ? plannedSeconds(current) / 60
+                  : preferences(s).focus_minutes
+              }
+            />
+          </label>
+          <p className="small muted">
+            {current
+              ? "Gesamtdauer dieses Blocks. Bereits vergangene Fokuszeit bleibt erhalten."
+              : "Dauer für diesen Block. Deine Standarddauer bleibt unverändert."}
+          </p>
+          <button disabled={busy || !today} className="primary">
+            {current ? "Zeit übernehmen" : "Fokusblock starten"}
           </button>
-        )}
+        </form>
+      )}
+      <div className="button-row">
         {current?.status === "active" && (
           <button
             disabled={busy || !today}

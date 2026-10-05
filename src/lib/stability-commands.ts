@@ -179,6 +179,22 @@ export function applyStabilityCommand(
       if (expired && ["pause", "resume", "end", "reset"].includes(c.action))
         return true;
       const running = s.work_sessions.find((w) => w.status !== "done");
+      if (c.action === "set-duration") {
+        if (!running || !["active", "paused"].includes(running.status))
+          throw new Error(
+            "Die Zeit kann nur für einen laufenden oder pausierten Fokusblock geändert werden.",
+          );
+        if (c.minutes === undefined)
+          throw new Error("Bitte eine Fokusdauer angeben.");
+        if (Math.round(c.minutes * 60) <= focusSeconds(running, now))
+          throw new Error(
+            "Die Gesamtdauer muss länger als die bereits vergangene Fokuszeit sein.",
+          );
+        running.planned_minutes = Math.max(5, Math.ceil(c.minutes));
+        running.planned_seconds = Math.round(c.minutes * 60);
+        running.updated_at = stamp;
+        return true;
+      }
       if (c.action === "start") {
         if (running)
           throw new Error("Beende zuerst den laufenden Block oder die Pause.");
@@ -188,8 +204,8 @@ export function applyStabilityCommand(
           local_date: c.date,
           started_at: stamp,
           ended_at: null,
-          planned_minutes: Math.max(5, Math.ceil(p.focus_minutes)),
-          planned_seconds: Math.round(p.focus_minutes * 60),
+          planned_minutes: Math.max(5, Math.ceil(c.minutes ?? p.focus_minutes)),
+          planned_seconds: Math.round((c.minutes ?? p.focus_minutes) * 60),
           completed_by_timer: false,
           was_reset: false,
           planned_break_minutes: p.break_minutes,
