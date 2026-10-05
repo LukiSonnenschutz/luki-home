@@ -1,10 +1,13 @@
 "use client";
 import Link from "next/link";
+import { useState } from "react";
+import { alarmTones, playTone, unlockAudio, type AlarmTone } from "@/lib/audio";
 import type { State, Command } from "@/lib/model";
 import {
   preferences,
   coffeeForDay,
   focusSeconds,
+  plannedSeconds,
   nextStep,
   stabilityHints,
   type Preferences,
@@ -25,7 +28,14 @@ const clockDuration = (seconds: number) => {
 export function WorkTracker({ state: s, date, now, save, busy }: Props) {
   const current = s.work_sessions.find((w) => w.status !== "done");
   const rows = s.work_sessions.filter((w) => w.local_date === date);
-  const w = current || [...rows].reverse().find((w) => !w.break_started_at);
+  const latest = [...rows].sort((a, b) =>
+    b.started_at.localeCompare(a.started_at),
+  )[0];
+  const w =
+    current ||
+    (latest?.was_reset
+      ? undefined
+      : [...rows].reverse().find((w) => !w.break_started_at));
   const today = date === localClock(now, s.profile.timezone).date;
   const elapsed = w ? focusSeconds(w, now) : 0;
   const inBreak = w?.status === "break";
@@ -34,7 +44,7 @@ export function WorkTracker({ state: s, date, now, save, busy }: Props) {
     : 0;
   const remaining = inBreak
     ? w!.planned_break_minutes * 60 - breakSeconds
-    : (w?.planned_minutes || preferences(s).focus_minutes) * 60 - elapsed;
+    : (w ? plannedSeconds(w) : preferences(s).focus_minutes * 60) - elapsed;
   const action = (action: Extract<Command, { type: "work" }>["action"]) =>
     save({ type: "work", date, action });
   return (
@@ -57,7 +67,9 @@ export function WorkTracker({ state: s, date, now, save, busy }: Props) {
         Vergangen: {clockDuration(inBreak ? breakSeconds : elapsed)} ·{" "}
         {inBreak
           ? w!.planned_break_minutes
-          : w?.planned_minutes || preferences(s).focus_minutes}{" "}
+          : w
+            ? plannedSeconds(w) / 60
+            : preferences(s).focus_minutes}{" "}
         Minuten geplant
       </p>
       <div className="button-row">
@@ -86,6 +98,15 @@ export function WorkTracker({ state: s, date, now, save, busy }: Props) {
             onClick={() => action("resume")}
           >
             Fokus fortsetzen
+          </button>
+        )}
+        {current && !inBreak && (
+          <button
+            disabled={busy || !today}
+            className="secondary"
+            onClick={() => action("reset")}
+          >
+            Zurücksetzen
           </button>
         )}
         {current && !inBreak && (
@@ -133,7 +154,7 @@ export function WorkTracker({ state: s, date, now, save, busy }: Props) {
       )}
       <div className="metric-summary">
         <strong>
-          {rows.length}
+          {rows.filter((w) => !w.was_reset).length}
           <small>Fokusblöcke</small>
         </strong>
         <strong>
@@ -342,9 +363,12 @@ export function StabilityHints({
   );
 }
 export function PreferenceFields({ settings: p }: { settings: Preferences }) {
+  const [tone, setTone] = useState<AlarmTone>(p.alarm_tone),
+    [volume, setVolume] = useState(p.alarm_volume),
+    [audioStatus, setAudioStatus] = useState("");
   const numeric: Array<[keyof Preferences, string, number, number]> = [
     ["coffee_limit", "Kaffee-Tageslimit", 0, 20],
-    ["focus_minutes", "Fokusblock · Minuten", 5, 240],
+    ["focus_minutes", "Fokusblock · Minuten", 0.1, 240],
     ["break_minutes", "Pause · Minuten", 5, 60],
     ["calories_target", "Kalorienziel · kcal", 0, 10000],
     ["protein_target", "Proteinziel · g (optional)", 0, 500],
@@ -373,6 +397,7 @@ export function PreferenceFields({ settings: p }: { settings: Preferences }) {
               name={key}
               min={min}
               max={max}
+              step={key === "focus_minutes" ? "any" : 1}
               required={key !== "protein_target"}
               defaultValue={(p[key] as number) ?? ""}
             />
@@ -387,6 +412,68 @@ export function PreferenceFields({ settings: p }: { settings: Preferences }) {
           </select>
         </label>
       </div>
+      <label className="checkbox-label">
+        <input
+          type="checkbox"
+          name="training_enabled"
+          defaultChecked={p.training_enabled}
+        />
+        Trainingsmodul aktiv
+      </label>
+      <label className="checkbox-label">
+        <input
+          type="checkbox"
+          name="alarm_enabled"
+          defaultChecked={p.alarm_enabled}
+        />
+        Fokus-Hinweiston aktiv
+      </label>
+      <label>
+        Klingelton
+        <select
+          name="alarm_tone"
+          value={tone}
+          onChange={(e) => setTone(e.target.value as AlarmTone)}
+        >
+          {alarmTones.map((t) => (
+            <option key={t} value={t}>
+              {t[0].toUpperCase() + t.slice(1)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Lautstärke
+        <input
+          type="range"
+          name="alarm_volume"
+          min="0"
+          max="1"
+          step="0.05"
+          value={volume}
+          onChange={(e) => setVolume(Number(e.target.value))}
+        />
+      </label>
+      <button
+        type="button"
+        className="secondary"
+        onClick={() => {
+          void unlockAudio()
+            .then(() =>
+              setAudioStatus(
+                playTone(tone, volume)
+                  ? `Ton abgespielt · ${tone}`
+                  : "Ton ist stumm oder vom Browser gesperrt.",
+              ),
+            )
+            .catch(() => setAudioStatus("Ton ist vom Browser gesperrt."));
+        }}
+      >
+        Ton testen
+      </button>
+      <p className="small" role="status">
+        {audioStatus}
+      </p>
       <label className="checkbox-label">
         <input
           type="checkbox"

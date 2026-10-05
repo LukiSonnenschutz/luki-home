@@ -1,5 +1,10 @@
 import type { State, Command } from "./model";
-import { coffeeForDay, focusSeconds, preferences } from "./stability";
+import {
+  coffeeForDay,
+  focusSeconds,
+  expireWork,
+  preferences,
+} from "./stability";
 import { localClock } from "./time";
 
 export function applyStabilityCommand(
@@ -170,6 +175,9 @@ export function applyStabilityCommand(
     case "work": {
       if (c.date !== localClock(now, s.profile.timezone).date)
         throw new Error("Der Work-Tracker gilt für heute.");
+      const expired = expireWork(s, now);
+      if (expired && ["pause", "resume", "end", "reset"].includes(c.action))
+        return true;
       const running = s.work_sessions.find((w) => w.status !== "done");
       if (c.action === "start") {
         if (running)
@@ -180,7 +188,10 @@ export function applyStabilityCommand(
           local_date: c.date,
           started_at: stamp,
           ended_at: null,
-          planned_minutes: p.focus_minutes,
+          planned_minutes: Math.max(5, Math.ceil(p.focus_minutes)),
+          planned_seconds: Math.round(p.focus_minutes * 60),
+          completed_by_timer: false,
+          was_reset: false,
           planned_break_minutes: p.break_minutes,
           elapsed_seconds: 0,
           focus_started_at: stamp,
@@ -220,6 +231,7 @@ export function applyStabilityCommand(
       if (
         c.action === "pause" ||
         c.action === "end" ||
+        c.action === "reset" ||
         c.action === "break-start"
       ) {
         w.elapsed_seconds = focusSeconds(w, now);
@@ -231,9 +243,10 @@ export function applyStabilityCommand(
         w.status = "active";
         w.focus_started_at = stamp;
       }
-      if (c.action === "end") {
+      if (c.action === "end" || c.action === "reset") {
         w.status = "done";
         w.ended_at = stamp;
+        w.was_reset = c.action === "reset";
       }
       if (c.action === "break-start") {
         w.status = "break";

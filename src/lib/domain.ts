@@ -7,6 +7,7 @@ import {
 import { localClock } from "./time";
 import { upgradeState, wakeTarget } from "./stability";
 import { applyStabilityCommand } from "./stability-commands";
+import { applyTrainingCommand } from "./training-commands";
 
 export function ensureDay(s: State, date: string) {
   upgradeState(s);
@@ -147,6 +148,7 @@ export function evaluateRules(
 export function applyCommand(s: State, c: Command, now: Date) {
   const stamp = now.toISOString();
   const plan = ensureDay(s, c.date);
+  if (applyTrainingCommand(s, c, now)) return;
   if (applyStabilityCommand(s, c, now)) return;
   if (
     (c.type === "task-create" || c.type === "task-edit") &&

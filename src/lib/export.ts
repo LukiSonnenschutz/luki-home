@@ -1,6 +1,7 @@
 import JSZip from "jszip";
 import { APP_VERSION } from "./version";
 import type { State } from "./model";
+import { trainingCollections } from "./training";
 export async function exportState(s: State, now: Date) {
   const zip = new JSZip();
   const highlights = s.day_plans.flatMap((d) =>
@@ -12,6 +13,7 @@ export async function exportState(s: State, now: Date) {
     })),
   );
   const files: Record<string, unknown> = {
+    ...Object.fromEntries(trainingCollections.map((key) => [key, s[key]])),
     goals: s.goals,
     goal_milestones: s.goal_milestones,
     coffee_entries: s.coffee_entries,
@@ -45,7 +47,7 @@ export async function exportState(s: State, now: Date) {
     "manifest.json",
     JSON.stringify(
       {
-        export_schema_version: 2,
+        export_schema_version: 3,
         app_version: APP_VERSION,
         exported_at: now.toISOString(),
         timezone: s.profile.timezone,

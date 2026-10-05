@@ -1,5 +1,10 @@
 import JSZip from "jszip";
 import { z } from "zod";
+import {
+  trainingCollections,
+  trainingSchemas,
+  validateTrainingRelations,
+} from "./training";
 import { anchorKeys, dateSchema, timeSchema, type State } from "./model";
 import {
   categories,
@@ -16,6 +21,31 @@ const row = { id, user_id: id };
 const score = z.number().int().min(1).max(5).nullable();
 const rule = z.enum(["wake_up_late", "movement_missing", "work_end_due"]);
 const stateSchema = z.object({
+  training_plans: z
+    .array(trainingSchemas.training_plans)
+    .max(20000)
+    .default([]),
+  workout_templates: z
+    .array(trainingSchemas.workout_templates)
+    .max(20000)
+    .default([]),
+  workout_template_items: z
+    .array(trainingSchemas.workout_template_items)
+    .max(20000)
+    .default([]),
+  scheduled_workouts: z
+    .array(trainingSchemas.scheduled_workouts)
+    .max(20000)
+    .default([]),
+  workout_sessions: z
+    .array(trainingSchemas.workout_sessions)
+    .max(20000)
+    .default([]),
+  workout_session_items: z
+    .array(trainingSchemas.workout_session_items)
+    .max(20000)
+    .default([]),
+  workout_sets: z.array(trainingSchemas.workout_sets).max(100000).default([]),
   goals: z
     .array(
       z
@@ -95,6 +125,15 @@ const stateSchema = z.object({
           started_at: timestamp,
           ended_at: timestamp.nullable(),
           planned_minutes: z.number().int().min(5).max(240),
+          planned_seconds: z
+            .number()
+            .int()
+            .min(1)
+            .max(14400)
+            .nullable()
+            .optional(),
+          completed_by_timer: z.boolean().optional(),
+          was_reset: z.boolean().optional(),
           planned_break_minutes: z.number().int().min(5).max(60),
           actual_minutes: z.number().finite().nonnegative(),
           elapsed_seconds: z.number().finite().nonnegative(),
@@ -253,6 +292,7 @@ export function validateImportedState(
   const s = stateSchema.parse(value);
   const source = s.profile.user_id;
   const tables = [
+    ...trainingCollections.map((key) => s[key]),
     s.goals,
     s.goal_milestones,
     s.coffee_entries,
@@ -305,6 +345,7 @@ export function validateImportedState(
   )
     throw new Error("Der Export enthält ungültige Verknüpfungen.");
   s.profile.user_id = targetUserId;
+  validateTrainingRelations(s);
   for (const rows of tables) for (const row of rows) row.user_id = targetUserId;
   return upgradeState(s);
 }
@@ -341,7 +382,11 @@ export async function importArchive(
   };
   const manifest = z
     .object({
-      export_schema_version: z.union([z.literal(1), z.literal(2)]),
+      export_schema_version: z.union([
+        z.literal(1),
+        z.literal(2),
+        z.literal(3),
+      ]),
       counts: z.record(z.string(), z.number().int().nonnegative()),
     })
     .parse(await json("manifest"));
@@ -356,7 +401,7 @@ export async function importArchive(
     "anchor_entries",
     "checkins",
     "intervention_events",
-    ...(manifest.export_schema_version === 2
+    ...(manifest.export_schema_version >= 2
       ? [
           "goals",
           "goal_milestones",
@@ -366,6 +411,7 @@ export async function importArchive(
           "categories",
         ]
       : []),
+    ...(manifest.export_schema_version === 3 ? trainingCollections : []),
   ]) {
     files[name] = await json(name);
     if (

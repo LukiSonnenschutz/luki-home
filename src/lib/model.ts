@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { trainingCommandSchemas, type TrainingState } from "./training";
 import {
   categories,
   goalStatuses,
@@ -106,7 +107,7 @@ export interface Intervention {
   snoozed_until: string | null;
   dismissed_at: string | null;
 }
-export interface State {
+export interface State extends TrainingState {
   goals: Goal[];
   goal_milestones: Milestone[];
   coffee_entries: CoffeeEntry[];
@@ -157,6 +158,7 @@ const goalFields = {
   target_date: dateSchema.nullable(),
 };
 export const commandSchema = z.discriminatedUnion("type", [
+  ...trainingCommandSchemas,
   z
     .object({
       type: z.literal("goal-save"),
@@ -219,6 +221,7 @@ export const commandSchema = z.discriminatedUnion("type", [
       "end",
       "break-start",
       "break-end",
+      "reset",
     ]),
   }),
   z.object({
@@ -345,6 +348,13 @@ export function newState(user_id: string, display_name = "Lukas"): State {
     ],
   ];
   return {
+    training_plans: [],
+    workout_templates: [],
+    workout_template_items: [],
+    scheduled_workouts: [],
+    workout_sessions: [],
+    workout_session_items: [],
+    workout_sets: [],
     schema_version: 1,
     goals: [],
     goal_milestones: [],

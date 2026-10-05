@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { State, Task } from "./model";
 import { localClock } from "./time";
+import { upgradeTraining } from "./training";
 
 export const categories = [
   "Gesundheit & Körper",
@@ -27,7 +28,11 @@ export const preferenceSchema = z.object({
   wake_weekend: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   coffee_limit: z.number().int().min(0).max(20),
   coffee_cutoff: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-  focus_minutes: z.number().int().min(5).max(240),
+  focus_minutes: z.number().min(0.1).max(240),
+  training_enabled: z.boolean().default(true),
+  alarm_tone: z.enum(["bell", "digital", "soft", "alert"]).default("bell"),
+  alarm_volume: z.number().min(0).max(1).default(0.5),
+  alarm_enabled: z.boolean().default(true),
   break_minutes: z.number().int().min(5).max(60),
   calories_target: z.number().int().min(0).max(10000),
   protein_target: z.number().int().min(0).max(500).nullable(),
@@ -48,6 +53,10 @@ export const defaultPreferences: Preferences = {
   theme: "dark",
   coffee_rule: true,
   work_rule: true,
+  training_enabled: true,
+  alarm_tone: "bell",
+  alarm_volume: 0.5,
+  alarm_enabled: true,
 };
 export interface Goal {
   id: string;
@@ -97,6 +106,9 @@ export interface DailyMetric {
   updated_at: string;
 }
 export interface WorkSession {
+  planned_seconds?: number | null;
+  completed_by_timer?: boolean;
+  was_reset?: boolean;
   id: string;
   user_id: string;
   local_date: string;
@@ -129,7 +141,7 @@ export function upgradeState(s: State): State {
       "08:00",
     ...s.settings.preferences,
   };
-  return s;
+  return upgradeTraining(s);
 }
 export function preferences(s: State): Preferences {
   return { ...defaultPreferences, ...s.settings.preferences };
@@ -149,6 +161,31 @@ export function focusSeconds(w: WorkSession, now: Date) {
         )
       : 0)
   );
+}
+export function plannedSeconds(w: WorkSession) {
+  return w.planned_seconds ?? w.planned_minutes * 60;
+}
+/** Computes the deadline from persisted elapsed time, not interval ticks. */
+export function expireWork(s: State, now: Date) {
+  const w = s.work_sessions.find(
+    (w) => w.status === "active" && w.focus_started_at,
+  );
+  if (!w || focusSeconds(w, now) < plannedSeconds(w)) return false;
+  const deadline = new Date(
+    new Date(w.focus_started_at!).getTime() +
+      Math.max(0, plannedSeconds(w) - w.elapsed_seconds) * 1000,
+  ).toISOString();
+  const elapsed = Math.max(plannedSeconds(w), w.elapsed_seconds);
+  Object.assign(w, {
+    elapsed_seconds: elapsed,
+    actual_minutes: elapsed / 60,
+    focus_started_at: null,
+    status: "done",
+    ended_at: deadline,
+    completed_by_timer: true,
+    updated_at: now.toISOString(),
+  });
+  return true;
 }
 export function nextStep(s: State, goalId: string): Task | undefined {
   return s.tasks
@@ -171,9 +208,9 @@ export function stabilityHints(s: State, date: string, now: Date): string[] {
   if (date !== clock.date) return [];
   const hints: string[] = [];
   const w = s.work_sessions.find((w) => w.status === "active");
-  if (p.work_rule && w && focusSeconds(w, now) >= w.planned_minutes * 60)
+  if (p.work_rule && w && focusSeconds(w, now) >= plannedSeconds(w))
     hints.push(
-      focusSeconds(w, now) >= (w.planned_minutes + 15) * 60
+      focusSeconds(w, now) >= plannedSeconds(w) + 900
         ? "Du sitzt gerade wieder zu lange am Bildschirm. Beende den Block und mach jetzt eine echte Pause."
         : "Fokusblock beendet. Jetzt weg vom Bildschirm und eine echte Pause machen.",
     );

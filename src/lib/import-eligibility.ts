@@ -1,6 +1,8 @@
 import type { State } from "./model";
+import { trainingCollections } from "./training";
 export function isEmptyForImport(s: State) {
   return (
+    trainingCollections.every((key) => !s[key]?.length) &&
     !s.goals?.length &&
     !s.goal_milestones?.length &&
     !s.coffee_entries?.length &&

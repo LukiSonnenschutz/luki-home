@@ -6,6 +6,7 @@ import { dateSchema, commandSchema } from "@/lib/model";
 import { localClock } from "@/lib/time";
 import { applyCommand, ensureDay, evaluateRules } from "@/lib/domain";
 import { body, errorResponse } from "@/lib/http";
+import { expireWork } from "@/lib/stability";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
       uid,
       (s) => {
         ensureDay(s, date);
+        expireWork(s, now);
         return evaluateRules(s, date, now);
       },
       true,
@@ -57,6 +59,7 @@ export async function POST(request: Request) {
           "Bitte einen heutigen oder früheren Tag wählen.",
         );
       try {
+        if (c.type !== "work") expireWork(s, now);
         applyCommand(s, c, now);
       } catch (e) {
         throw new HttpError(

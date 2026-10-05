@@ -15,7 +15,7 @@ test("Cloud-Vertrag: privater Login, ZIP-Übernahme, Speicherung und Abmeldung",
     .fill("cloud-fixture-password-2026");
   await page.getByRole("button", { name: "Anmelden", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Lukas/ })).toBeVisible();
-  await expect(page.getByText("Online · v0.2.0")).toBeVisible();
+  await expect(page.getByText("Online · v0.3.0")).toBeVisible();
   const cookies = await context.cookies();
   expect(
     cookies.some((c) => c.name.startsWith("luki-home-auth") && c.httpOnly),
@@ -119,6 +119,40 @@ test("Cloud-Vertrag: privater Login, ZIP-Übernahme, Speicherung und Abmeldung",
   await page
     .getByRole("button", { name: "Fokus beenden", exact: true })
     .click();
+  // Real HTTP → authenticated SSR client → v3 PostgreSQL RPC → durable session.
+  const sendTraining = async (command: Record<string, unknown>) => {
+    const current = (await (await page.request.get("/api/state")).json()).state;
+    const response = await page.request.post("/api/state", {
+      headers: { Origin: "http://127.0.0.1:3102" },
+      data: { ...command, date, revision: current.revision },
+    });
+    expect(response.status(), await response.text()).toBe(200);
+    return (await response.json()).state;
+  };
+  let train = await sendTraining({
+    type: "training-template-save",
+    id: null,
+    training_plan_id: null,
+    name: "Cloud Workout",
+    description: "",
+    workout_type: "free",
+  });
+  train = await sendTraining({
+    type: "training-start",
+    template_id: train.workout_templates[0].id,
+    scheduled_id: null,
+  });
+  await sendTraining({
+    type: "training-finish",
+    id: train.workout_sessions[0].id,
+    notes: "HTTP roundtrip",
+    rating: 4,
+  });
+  await page.reload();
+  const trainReload = (await (await page.request.get("/api/state")).json())
+    .state;
+  expect(trainReload.workout_sessions[0].status).toBe("completed");
+  expect(trainReload.workout_sessions[0].notes).toBe("HTTP roundtrip");
   await page.getByRole("button", { name: "Abmelden" }).click();
   await expect(page).toHaveURL(/login/);
   expect((await page.request.get("/api/state")).status()).toBe(401);

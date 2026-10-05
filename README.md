@@ -1,8 +1,19 @@
-# Luki Home 0.2.0
+# Luki Home 0.3.0
 
 Persönliche Web-App für Ziele, Aufgaben, Stabilität und Abend-Check-in. Next.js/React/TypeScript, lokaler SQLite-Betrieb oder Supabase Auth/PostgreSQL für Online-Betrieb. Production: [luki-home.vercel.app](https://luki-home.vercel.app). Die Projektdateien unter `../sources/` werden nicht verwendet oder verändert.
 
-## Neu in 0.2
+## Neu in 0.3
+
+- Freie Trainingspläne A/B und weitere Pläne, eigene Vorlagen, Wochenstruktur und verschiebbare Termine.
+- Kraft, HYROX und gemischte Workouts mit frei sortierbaren Übungen/Stationen; Drag-and-drop sowie Touch-/Tastaturpfeile.
+- Laufende Sessions mit tatsächlichen Satz-/Rundenwerten, letzter erfasster Leistung und unveränderlicher Historie. Änderungen nur heute oder dauerhaft an der Vorlage.
+- Training in den Einstellungen ausblenden, ohne Daten zu löschen.
+- Fokus-Timer mit Reset, persistierter Ablaufzeit, vier selbst erzeugten Signaltönen, Lautstärke und Tontest.
+- Exportformat 3 einschließlich Training; ältere Formate 1/2 bleiben importierbar.
+
+Architektur, Abnahme und Rückweg: [UPDATE-0.3.md](docs/UPDATE-0.3.md).
+
+## Historisch: Neu in 0.2
 
 - Ziele mit Warum, Erfolgskriterium, sechs Kategorien, Priorität, Status, Zeitraum und optionalem Fokus. Mehr als fünf Fokus-Ziele erzeugen einen Hinweis, keine Sperre.
 - Eigene Zielseiten unter `/goals/[id]`, sortierbare Meilensteine und zugehörige Aufgaben. Der nächste Schritt wird aus offenen Aufgaben abgeleitet.

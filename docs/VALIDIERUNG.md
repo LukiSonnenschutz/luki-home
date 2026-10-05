@@ -1,4 +1,8 @@
-# Validierung — Luki Home 0.2.0
+# Validierung — Luki Home 0.3.0
+
+## Update-Prüfung 0.3
+
+Die komplette Trainings-/Timer-Abnahme, Datenbankprüfung, Migration, Export 3, Grenzen und Rückweg sind in [UPDATE-0.3.md](UPDATE-0.3.md) beschrieben. Veröffentlichung und Production-Prüfung werden nach finaler GitHub-CI im Abschlussbericht festgehalten. Die folgenden Abschnitte dokumentieren frühere Versionen.
 
 ## Update-Prüfung am 5. Oktober 2026
 
