@@ -116,6 +116,15 @@ export function WorkTracker({ state: s, date, now, save, busy }: Props) {
           </button>
         )}
       </div>
+      {preferences(s).work_rule &&
+        today &&
+        w?.status === "done" &&
+        !w.break_started_at && (
+          <p className="notice">
+            Fokusblock beendet. Jetzt weg vom Bildschirm und eine echte Pause
+            machen.
+          </p>
+        )}
       {preferences(s).work_rule && inBreak && remaining < -300 && (
         <p className="notice">
           Die geplante Pause ist überzogen. Entscheide bewusst, wie du

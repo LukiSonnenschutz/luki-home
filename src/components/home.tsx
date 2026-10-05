@@ -311,7 +311,14 @@ export default function Home({
   const plan = s.day_plans.find((d) => d.local_date === data.date)!;
   const focusTitle =
     plan.focus_text || s.tasks.find((t) => t.id === plan.focus_task_id)?.title;
-  const entries = s.anchor_entries.filter((e) => e.local_date === data.date);
+  const entries = s.anchor_entries.filter(
+    (e) =>
+      e.local_date === data.date &&
+      !s.anchor_definitions.some(
+        (a) =>
+          a.id === e.anchor_id && (a.key === "coffee_rule" || a.key === "meal"),
+      ),
+  );
   const checkin = s.checkins.find((c) => c.local_date === data.date);
   const clock = localClock(now, s.profile.timezone);
   const hour = Number(clock.time.slice(0, 2));

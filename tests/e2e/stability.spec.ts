@@ -189,6 +189,12 @@ test("0.2: Ziele, gemeinsame Aufgaben, Tageswerte, persistenter Tracker und mobi
   await page
     .getByRole("button", { name: "Fokus beenden", exact: true })
     .click();
+  await expect(
+    page.getByText(
+      "Fokusblock beendet. Jetzt weg vom Bildschirm und eine echte Pause machen.",
+      { exact: true },
+    ),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Pause starten", exact: true })
     .click();

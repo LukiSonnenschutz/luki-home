@@ -4,7 +4,7 @@
 
 Production-Ausgangspunkt: GitHub-Commit `95b90f438b11067236c9fb2df155d293c2ef7e86`, Vercel-Deployment `dpl_EngTsPN7E5hmRzENgt36Uv9jspNX` (0.1.1). Vor Änderungen wurden GitHub-Stand, neun bestehende Luki-Home-Tabellen mit RLS, Migrationshistorie und UI geprüft. Geschäftliche Tabellen im Schema public werden nicht geändert.
 
-Die mit Supabase CLI angelegte Migration `20261005063711_goals_stability_v02.sql` ergänzt `luki_home.goals`, `goal_milestones`, `coffee_entries`, `work_sessions`, `daily_metrics`. Bestehende Tabellen erhalten nullable `tasks.goal_id`, `user_settings.preferences`, `day_plans.training_status` und drei Check-in-Flags. Keine Tabelle und keine bestehende Spalte wird gelöscht. Einstellungen bleiben in der vorhandenen Tabelle; es gibt keinen parallelen Preference-Speicher.
+Die mit Supabase CLI angelegte Migration `20261005073432_goals_stability_v02.sql` ergänzt `luki_home.goals`, `goal_milestones`, `coffee_entries`, `work_sessions`, `daily_metrics`. Bestehende Tabellen erhalten nullable `tasks.goal_id`, `user_settings.preferences`, `day_plans.training_status` und drei Check-in-Flags. Keine Tabelle und keine bestehende Spalte wird gelöscht. Einstellungen bleiben in der vorhandenen Tabelle; es gibt keinen parallelen Preference-Speicher.
 
 RLS schützt alle neuen Tabellen. Meilensteine prüfen zusätzlich die Eigentümerschaft des Parent-Ziels; zusammengesetzte Fremdschlüssel verhindern fremde Ziel-/Task-Zuordnungen. Kein Browser verwendet einen Service-Role-Key. v2-RPCs laufen als SECURITY INVOKER mit leerem search_path, ohne anonymes Ausführungsrecht. Optimistische Revisionen und eine Transaktion schützen vollständige Änderungen vor Konflikten und Teil-Speicherung.
 
@@ -32,3 +32,11 @@ Bei Problemen das genannte vorherige Vercel-Deployment wieder als Production zuw
 - Browser: Zielseiten, Kaffee und Metrics nach Reload, Tracker nach Navigation/Reload, Einstellungen und mobile Ansicht. Supabase-HTTP/Auth-Vertrag wird mit einer isolierten PostgreSQL-Fixture geprüft; diese ersetzt nicht den persönlichen Live-Login.
 
 Nach Deployment persönlichen Login, gespeicherte Aufgaben und alle neuen Bereiche im Browser prüfen. Falls noch keine authentifizierte Browser-Sitzung vorliegt, meldet sich Lukas selbst an; keine Passwörter in den Chat senden.
+
+## Host-Prüfung der Migration
+
+Am 5. Oktober 2026 nach erfolgreicher GitHub-CI für cf474419 wurde die Migration über Supabase angewendet. Registry-Version: 20261005073432, Name goals_stability_v02. Die SQL-Datei ist auf diese registrierte Version abgestimmt, damit der nächste CLI-Migrationsabgleich konsistent bleibt.
+
+Zeilenzahlen und Fingerprints aller ursprünglichen Spalten der neun bestehenden Luki-Home-Tabellen sind vor/nach Migration identisch. Die fünf neuen Tabellen sind leer. Alle 14 Tabellen haben Owner-RLS; Meilensteine zusätzlich Parent-Prüfung. Beide v2-RPCs sind SECURITY INVOKER, fester leerer search_path, keine anonyme Ausführung.
+
+Security Advisor: keine Befunde zu Luki-Home-Tabellen. Sieben bestehende INFO-Hinweise betreffen public-Geschäftstabellen. Außerdem meldet der Provider deaktivierten Schutz vor bekannten geleakten Passwörtern für den gemeinsamen Auth-Dienst. Die globale Auth-Konfiguration wurde im Update nicht geändert; Aktivierung/Verfügbarkeit separat prüfen: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection.
