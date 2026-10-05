@@ -1,6 +1,6 @@
 // Offline authoring helper; the migration file was created by Supabase CLI.
 import { readFileSync, writeFileSync } from "node:fs";
-const path = "supabase/migrations/20261005110734_flexible_training_v03.sql";
+const path = "supabase/migrations/20261005121256_flexible_training_v03.sql";
 const tables = {
   training_plans: [],
   workout_templates: [["training_plan_id", "training_plans", true]],
