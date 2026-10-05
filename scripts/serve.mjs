@@ -1,0 +1,10 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+const appDir = resolve(fileURLToPath(new URL('..', import.meta.url)));
+process.chdir(appDir);
+const cli = resolve(appDir, 'node_modules/next/dist/bin/next');
+mkdirSync(resolve(appDir, 'data'), { recursive: true });
+writeFileSync(resolve(appDir, 'data/server.json'), JSON.stringify({ pid: process.pid, entrypoint: fileURLToPath(import.meta.url) }));
+process.argv = [process.execPath, cli, 'start', '--hostname', '127.0.0.1', '--port', '3100'];
+await import(pathToFileURL(cli).href);
