@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0 — 2026-10-05 — Ziele & Stabilität
+
+- Zielübersicht und eigene Detailseiten, Fokus-Ziele, Statuswechsel, Meilensteine mit Reihenfolge; Aufgaben optional mit einem Ziel verbunden.
+- Kaffeeeinträge mit Uhrzeit, Tageszähler, Limit und Cutoff; manuelle Kalorien-, Protein- und Bewegungswerte.
+- Persistenter Fokus-/Pausen-Tracker mit Start/Pause/Fortsetzen/Ende, Zeitstempeln und Tagesstatistik.
+- Persönliche Stabilitätseinstellungen, Theme, Trainingstatus und erweiterter Abend-Check-in.
+- Dashboard mit Fokus-Zielen, nächstem Task-Schritt und konfigurierbaren Kaffee-, Work-, Bewegungs- und Feierabendhinweisen.
+- Fünf neue RLS-Tabellen im vorhandenen Schema; additive Migration und v2-RPCs. v1-Schreibzugriffe erhalten neue Zielrelationen und Tagesflags.
+- Exportformat 2 mit allen neuen Beziehungen; Import von Format 1 und 2. Keine Zugangsdaten oder geschäftlichen Luki-OS-Änderungen.
+- Migration mit bestehenden Daten, zwei Nutzer, Konflikte, alte Clients, Timer und neue Browser-Abläufe getestet; Rückweg dokumentiert.
+
 ## 0.1.1 — 2026-10-04 — Online-Vorbereitung
 
 - Supabase Auth mit eigener HttpOnly-Sitzung, bestätigter persönlicher Login-Adresse und Wiederherstellung.

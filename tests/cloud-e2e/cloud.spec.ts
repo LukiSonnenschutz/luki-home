@@ -15,7 +15,7 @@ test("Cloud-Vertrag: privater Login, ZIP-Übernahme, Speicherung und Abmeldung",
     .fill("cloud-fixture-password-2026");
   await page.getByRole("button", { name: "Anmelden", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Lukas/ })).toBeVisible();
-  await expect(page.getByText("Online · v0.1.1")).toBeVisible();
+  await expect(page.getByText("Online · v0.2.0")).toBeVisible();
   const cookies = await context.cookies();
   expect(
     cookies.some((c) => c.name.startsWith("luki-home-auth") && c.httpOnly),
@@ -97,6 +97,28 @@ test("Cloud-Vertrag: privater Login, ZIP-Übernahme, Speicherung und Abmeldung",
     },
   });
   expect(repeat.status()).toBe(409);
+  await page.getByRole("button", { name: "+1 Kaffee", exact: true }).click();
+  await page.getByLabel("Kalorien · Tageswert", { exact: true }).fill("1840");
+  await page
+    .getByRole("button", { name: "Kalorien speichern", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Fokusblock starten", exact: true })
+    .click();
+  await page.reload();
+  await expect(page.getByText(/^Kaffee 1 \/ 3/)).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Kalorien 1.840 / 2.500 kcal",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Fokus pausieren", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Fokus beenden", exact: true })
+    .click();
   await page.getByRole("button", { name: "Abmelden" }).click();
   await expect(page).toHaveURL(/login/);
   expect((await page.request.get("/api/state")).status()).toBe(401);

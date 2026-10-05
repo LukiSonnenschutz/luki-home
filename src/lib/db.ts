@@ -3,6 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { newState, type State } from "./model";
+import { upgradeState } from "./stability";
 
 let instance: DatabaseSync | undefined;
 export function db() {
@@ -52,7 +53,7 @@ export function readState(userId: string): State {
     .prepare("SELECT payload FROM states WHERE user_id = ?")
     .get(userId) as { payload: string } | undefined;
   if (!row) throw new Error("Profil nicht gefunden.");
-  return JSON.parse(row.payload) as State;
+  return upgradeState(JSON.parse(row.payload) as State);
 }
 export function updateState<T>(userId: string, fn: (state: State) => T) {
   return transaction(() => {

@@ -1,6 +1,12 @@
 import JSZip from "jszip";
 import { z } from "zod";
 import { anchorKeys, dateSchema, timeSchema, type State } from "./model";
+import {
+  categories,
+  goalStatuses,
+  preferenceSchema,
+  upgradeState,
+} from "./stability";
 const id = z.string().uuid(),
   text = z.string().max(2000),
   short = z.string().max(200),
@@ -10,6 +16,106 @@ const row = { id, user_id: id };
 const score = z.number().int().min(1).max(5).nullable();
 const rule = z.enum(["wake_up_late", "movement_missing", "work_end_due"]);
 const stateSchema = z.object({
+  goals: z
+    .array(
+      z
+        .object({
+          ...row,
+          title: short.min(1),
+          why: text,
+          success_criteria: text,
+          category: z.enum(categories),
+          priority: z.number().int().min(1).max(3),
+          status: z.enum(goalStatuses),
+          is_focus: z.boolean(),
+          start_date: date.nullable(),
+          target_date: date.nullable(),
+          completed_at: timestamp.nullable(),
+          created_at: timestamp,
+          updated_at: timestamp,
+        })
+        .refine(
+          (g) =>
+            (g.status === "achieved") === (g.completed_at !== null) &&
+            (!g.start_date || !g.target_date || g.start_date <= g.target_date),
+        ),
+    )
+    .max(20000)
+    .default([]),
+  goal_milestones: z
+    .array(
+      z
+        .object({
+          ...row,
+          goal_id: id,
+          title: short.min(1),
+          description: text,
+          status: z.enum(["open", "done"]),
+          due_date: date.nullable(),
+          sort_order: z.number().int().nonnegative(),
+          completed_at: timestamp.nullable(),
+          created_at: timestamp,
+          updated_at: timestamp,
+        })
+        .refine((m) => (m.status === "done") === (m.completed_at !== null)),
+    )
+    .max(20000)
+    .default([]),
+  coffee_entries: z
+    .array(z.object({ ...row, consumed_at: timestamp, created_at: timestamp }))
+    .max(20000)
+    .default([]),
+  daily_metrics: z
+    .array(
+      z.object({
+        ...row,
+        date,
+        metric_type: z.enum([
+          "calories",
+          "protein",
+          "movement_minutes",
+          "caffeine_count",
+        ]),
+        value: z.number().finite().min(0).max(20000),
+        target: z.number().finite().min(0).max(20000).nullable(),
+        unit: z.string().max(20),
+        source: z.enum(["manual", "health", "external"]),
+        created_at: timestamp,
+        updated_at: timestamp,
+      }),
+    )
+    .max(20000)
+    .default([]),
+  work_sessions: z
+    .array(
+      z
+        .object({
+          ...row,
+          local_date: date,
+          started_at: timestamp,
+          ended_at: timestamp.nullable(),
+          planned_minutes: z.number().int().min(5).max(240),
+          planned_break_minutes: z.number().int().min(5).max(60),
+          actual_minutes: z.number().finite().nonnegative(),
+          elapsed_seconds: z.number().finite().nonnegative(),
+          focus_started_at: timestamp.nullable(),
+          status: z.enum(["active", "paused", "break", "done"]),
+          break_started_at: timestamp.nullable(),
+          break_ended_at: timestamp.nullable(),
+          break_taken: z.boolean(),
+          break_overrun: z.boolean(),
+          created_at: timestamp,
+          updated_at: timestamp,
+        })
+        .refine(
+          (w) =>
+            (w.status === "active") === (w.focus_started_at !== null) &&
+            (w.status !== "break" || w.break_started_at !== null) &&
+            (w.status !== "done" || w.ended_at !== null),
+        ),
+    )
+    .max(20000)
+    .default([]),
   schema_version: z.literal(1),
   revision: z.number().int().min(0),
   profile: z.object({
@@ -25,6 +131,7 @@ const stateSchema = z.object({
     }),
   }),
   settings: z.object({
+    preferences: preferenceSchema.optional(),
     work_end_target: timeSchema,
     movement_time: timeSchema,
     checkin_time: timeSchema,
@@ -40,6 +147,7 @@ const stateSchema = z.object({
         .object({
           ...row,
           title: short.trim().min(1),
+          goal_id: id.nullable().optional(),
           notes: text,
           due_date: date.nullable(),
           status: z.enum(["open", "done"]),
@@ -59,6 +167,7 @@ const stateSchema = z.object({
         focus_task_id: id.nullable(),
         training_note: short,
         training_time: timeSchema.nullable(),
+        training_status: z.enum(["open", "planned", "done"]).optional(),
         highlights: z.array(id).max(3),
       }),
     )
@@ -100,6 +209,9 @@ const stateSchema = z.object({
           ...row,
           local_date: date,
           energy: score,
+          movement_done: z.boolean().optional(),
+          training_done: z.boolean().optional(),
+          work_end_kept: z.boolean().optional(),
           mood: score,
           stress: score,
           helped_text: text,
@@ -141,6 +253,11 @@ export function validateImportedState(
   const s = stateSchema.parse(value);
   const source = s.profile.user_id;
   const tables = [
+    s.goals,
+    s.goal_milestones,
+    s.coffee_entries,
+    s.work_sessions,
+    s.daily_metrics,
     s.tasks,
     s.day_plans,
     s.anchor_definitions,
@@ -169,6 +286,14 @@ export function validateImportedState(
     throw new Error("Der Export enthält doppelte Tagesdaten.");
   const tasks = new Set(s.tasks.map((t) => t.id)),
     anchors = new Set(s.anchor_definitions.map((a) => a.id));
+  const goals = new Set(s.goals.map((g) => g.id));
+  if (
+    s.tasks.some((t) => t.goal_id && !goals.has(t.goal_id)) ||
+    s.goal_milestones.some((m) => !goals.has(m.goal_id)) ||
+    !unique(s.daily_metrics.map((m) => `${m.date}:${m.metric_type}`)) ||
+    s.work_sessions.filter((w) => w.status !== "done").length > 1
+  )
+    throw new Error("Ungültige Verknüpfungen oder doppelte Tageswerte.");
   if (
     s.day_plans.some(
       (d) =>
@@ -181,7 +306,7 @@ export function validateImportedState(
     throw new Error("Der Export enthält ungültige Verknüpfungen.");
   s.profile.user_id = targetUserId;
   for (const rows of tables) for (const row of rows) row.user_id = targetUserId;
-  return s;
+  return upgradeState(s);
 }
 export async function importArchive(
   bytes: Uint8Array,
@@ -216,7 +341,7 @@ export async function importArchive(
   };
   const manifest = z
     .object({
-      export_schema_version: z.literal(1),
+      export_schema_version: z.union([z.literal(1), z.literal(2)]),
       counts: z.record(z.string(), z.number().int().nonnegative()),
     })
     .parse(await json("manifest"));
@@ -231,6 +356,16 @@ export async function importArchive(
     "anchor_entries",
     "checkins",
     "intervention_events",
+    ...(manifest.export_schema_version === 2
+      ? [
+          "goals",
+          "goal_milestones",
+          "coffee_entries",
+          "work_sessions",
+          "daily_metrics",
+          "categories",
+        ]
+      : []),
   ]) {
     files[name] = await json(name);
     if (

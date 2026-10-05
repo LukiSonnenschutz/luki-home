@@ -1,4 +1,19 @@
-# Validierung — Luki Home 0.1.1
+# Validierung — Luki Home 0.2.0
+
+## Update-Prüfung am 5. Oktober 2026
+
+- Produktions-Build/TypeScript, ESLint und 19 Fach-/Datenbanktests erfolgreich.
+- Drei lokale Browsertests und ein Cloud-Vertragstest erfolgreich. Bestehende Auth-/Task-/Check-in-/Export-Abläufe bleiben erhalten; Ziele erstellen/bearbeiten/Status/Fokus, Meilensteine, gemeinsame Aufgaben, Kaffee, Kalorien, Protein, Bewegung, Training und Einstellungen geprüft.
+- Work-Fokus/Pause/Fortsetzen/Ende, Seitenwechsel und Reload geprüft. Navigation aus Zielseiten aktualisiert jetzt die Adresse; Reload öffnet den ausgewählten Bereich.
+- Migration 0.1→0.2 mit bestehenden Daten, RPCs, alter Client, atomarer Rollback und Revisionen in PostgreSQL geprüft. RLS verweigert A/B-Fremdzugriffe und anonymen Zugriff; Parent-Ziel wird geprüft.
+- Desktop und 360-px-Mobilansicht geprüft: kein horizontaler Überlauf; helle Textkontraste korrigiert. Dark bleibt der Standard.
+- Cloud-Vertragstest nutzt isolierte Supabase-HTTP/Auth-Fixture und PostgreSQL; echte Production-Abnahme erfolgt nach CI und Veröffentlichung.
+- Vor dem Update wurde über die angemeldete Production-App ein ZIP exportiert und außerhalb des Git-Repositories als Luki-Home-Backup-vor-0.2.zip gesichert. Archivstruktur geprüft. Dies ist ein Anwendungsbackup, kein vollständiges Datenbank-/Auth-Backup.
+- Rollback zu Code 95b90f4 / Deployment dpl_EngTsPN7E5hmRzENgt36Uv9jspNX beschrieben in UPDATE-0.2.md; neue Tabellen bleiben dabei erhalten.
+
+Die folgenden Abschnitte dokumentieren frühere Prüfstände. Der aktuelle Veröffentlichungsstatus wird im Abschlussbericht separat festgehalten.
+
+## Historisch: Luki Home 0.1.1
 
 ## Online-Vorbereitung am 4. Oktober 2026
 

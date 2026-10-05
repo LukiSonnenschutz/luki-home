@@ -1,4 +1,16 @@
 import { z } from "zod";
+import {
+  categories,
+  goalStatuses,
+  preferenceSchema,
+  defaultPreferences,
+  type Preferences,
+  type Goal,
+  type Milestone,
+  type CoffeeEntry,
+  type DailyMetric,
+  type WorkSession,
+} from "./stability";
 
 export const anchorKeys = [
   "wake_up",
@@ -16,12 +28,14 @@ export interface Profile {
   timezone: string;
 }
 export interface Settings {
+  preferences?: Preferences;
   work_end_target: string;
   movement_time: string;
   checkin_time: string;
   rules: Record<RuleId, boolean>;
 }
 export interface Task {
+  goal_id?: string | null;
   id: string;
   user_id: string;
   title: string;
@@ -55,6 +69,7 @@ export interface AnchorEntry {
   description_snapshot: string;
 }
 export interface DayPlan {
+  training_status?: "open" | "planned" | "done";
   id: string;
   user_id: string;
   local_date: string;
@@ -65,6 +80,9 @@ export interface DayPlan {
   highlights: string[];
 }
 export interface Checkin {
+  movement_done?: boolean;
+  training_done?: boolean;
+  work_end_kept?: boolean;
   id: string;
   user_id: string;
   local_date: string;
@@ -89,6 +107,11 @@ export interface Intervention {
   dismissed_at: string | null;
 }
 export interface State {
+  goals: Goal[];
+  goal_milestones: Milestone[];
+  coffee_entries: CoffeeEntry[];
+  work_sessions: WorkSession[];
+  daily_metrics: DailyMetric[];
   schema_version: 1;
   revision: number;
   profile: Profile;
@@ -122,7 +145,87 @@ const shortText = z.string().trim().max(200);
 const note = z.string().max(2000);
 const score = z.number().int().min(1).max(5).nullable();
 const base = { date: dateSchema };
+const goalFields = {
+  title: shortText.min(1),
+  why: note,
+  success_criteria: note,
+  category: z.enum(categories),
+  priority: z.number().int().min(1).max(3),
+  status: z.enum(goalStatuses),
+  is_focus: z.boolean(),
+  start_date: dateSchema.nullable(),
+  target_date: dateSchema.nullable(),
+};
 export const commandSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("goal-save"),
+      ...base,
+      id: id.nullable(),
+      ...goalFields,
+    })
+    .refine(
+      (g) => !g.start_date || !g.target_date || g.start_date <= g.target_date,
+      "Zieldatum liegt vor dem Startdatum.",
+    ),
+  z.object({
+    type: z.literal("goal-status"),
+    ...base,
+    id,
+    status: z.enum(goalStatuses),
+  }),
+  z.object({
+    type: z.literal("goal-focus"),
+    ...base,
+    id,
+    enabled: z.boolean(),
+  }),
+  z.object({
+    type: z.literal("milestone-save"),
+    ...base,
+    id: id.nullable(),
+    goal_id: id,
+    title: shortText.min(1),
+    description: note,
+    due_date: dateSchema.nullable(),
+  }),
+  z.object({
+    type: z.literal("milestone-status"),
+    ...base,
+    id,
+    status: z.enum(["open", "done"]),
+  }),
+  z.object({
+    type: z.literal("milestone-order"),
+    ...base,
+    goal_id: id,
+    ids: z.array(id).max(1000),
+  }),
+  z.object({ type: z.literal("coffee-add"), ...base }),
+  z.object({
+    type: z.literal("metric"),
+    ...base,
+    metric_type: z.enum(["calories", "protein", "movement_minutes"]),
+    value: z.number().finite().min(0).max(20000),
+    source: z.enum(["manual", "external", "health"]),
+  }),
+  z.object({
+    type: z.literal("work"),
+    ...base,
+    action: z.enum([
+      "start",
+      "pause",
+      "resume",
+      "end",
+      "break-start",
+      "break-end",
+    ]),
+  }),
+  z.object({
+    type: z.literal("training-status"),
+    ...base,
+    status: z.enum(["open", "planned", "done"]),
+  }),
   z.object({
     type: z.literal("day"),
     ...base,
@@ -133,6 +236,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("task-create"),
+    goal_id: id.nullable().optional(),
     ...base,
     title: shortText.min(1),
     notes: note,
@@ -140,6 +244,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("task-edit"),
+    goal_id: id.nullable().optional(),
     ...base,
     id,
     title: shortText.min(1),
@@ -164,6 +269,9 @@ export const commandSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("checkin"),
+    movement_done: z.boolean().optional(),
+    training_done: z.boolean().optional(),
+    work_end_kept: z.boolean().optional(),
     ...base,
     energy: score,
     mood: score,
@@ -180,6 +288,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("settings"),
+    preferences: preferenceSchema.optional(),
     ...base,
     display_name: shortText.min(1),
     timezone: z.string().refine((v) => {
@@ -237,9 +346,15 @@ export function newState(user_id: string, display_name = "Lukas"): State {
   ];
   return {
     schema_version: 1,
+    goals: [],
+    goal_milestones: [],
+    coffee_entries: [],
+    work_sessions: [],
+    daily_metrics: [],
     revision: 0,
     profile: { user_id, display_name, timezone: "Europe/Berlin" },
     settings: {
+      preferences: { ...defaultPreferences },
       work_end_target: "17:00",
       movement_time: "14:00",
       checkin_time: "20:30",

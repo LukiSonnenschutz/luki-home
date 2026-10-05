@@ -12,6 +12,19 @@ export async function exportState(s: State, now: Date) {
     })),
   );
   const files: Record<string, unknown> = {
+    goals: s.goals,
+    goal_milestones: s.goal_milestones,
+    coffee_entries: s.coffee_entries,
+    work_sessions: s.work_sessions,
+    daily_metrics: s.daily_metrics,
+    categories: [
+      "Gesundheit & Körper",
+      "Beziehung & Familie",
+      "Firma",
+      "Abenteuer",
+      "Persönliche Entwicklung",
+      "Sonstiges",
+    ],
     profile: s.profile,
     settings: s.settings,
     tasks: s.tasks,
@@ -32,7 +45,7 @@ export async function exportState(s: State, now: Date) {
     "manifest.json",
     JSON.stringify(
       {
-        export_schema_version: 1,
+        export_schema_version: 2,
         app_version: APP_VERSION,
         exported_at: now.toISOString(),
         timezone: s.profile.timezone,
@@ -49,7 +62,7 @@ export async function exportState(s: State, now: Date) {
   );
   zip.file(
     "README.txt",
-    "Luki Home — persönlicher Datenexport\nAlle eigenen Anwendungsdaten, ohne Zugangsdaten. UTF-8 JSON.\nDatum: lokale Tageszuordnung; Zeitstempel: UTC.\nDies ist kein Systembackup. Ein Import ist in Version 0.1 nicht enthalten.\n",
+    "Luki Home — persönlicher Datenexport\nAlle eigenen Anwendungsdaten, ohne Zugangsdaten. UTF-8 JSON.\nDatum: lokale Tageszuordnung; Zeitstempel: UTC.\nImport nur in einen leeren Online-Zugang. Systembackup separat; siehe README.\n",
   );
   return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
 }
