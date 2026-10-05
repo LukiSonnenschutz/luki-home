@@ -32,6 +32,7 @@ test("Snapshots bleiben nach Änderungen erhalten; deaktivierte Anker fehlen am 
 });
 test("Regeln: genaue Zeitgrenze, Priorität, Snooze, Schließen, Wiederöffnen und historische Tage", () => {
   const s = newState(uid);
+  s.settings.preferences!.wake_weekend = "08:00";
   ensureDay(s, date);
   assert.equal(evaluateRules(s, date, new Date("2026-10-04T06:00:00Z")), null);
   assert.equal(
@@ -209,6 +210,6 @@ test("ZIP-Export enthält mehr als 1000 Einträge und alle Beziehungen", async (
   );
   assert.equal(highlights[0].task_id, s.tasks[0].id);
   assert.ok(
-    !Object.keys(zip.files).some((k) => /password|session|secret/.test(k)),
+    !Object.keys(zip.files).some((k) => /password|^sessions\.json$|secret/.test(k)),
   );
 });

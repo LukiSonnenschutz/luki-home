@@ -131,15 +131,15 @@ createServer(async (req, res) => {
     queue = queue.then(async () => {
       await db.query("select set_config('app.uid',$1,false)", [current.id]);
       try {
-        if (url.pathname.endsWith("/luki_home_get_state")) {
+        if (url.pathname.endsWith("/luki_home_get_state_v2")) {
           const r = await db.query(
-            "select public.luki_home_get_state() as state",
+            "select public.luki_home_get_state_v2() as state",
           );
           send(200, r.rows[0].state);
           return;
         }
-        if (url.pathname.endsWith("/luki_home_save_state")) {
-          await db.query("select public.luki_home_save_state($1::jsonb,$2)", [
+        if (url.pathname.endsWith("/luki_home_save_state_v2")) {
+          await db.query("select public.luki_home_save_state_v2($1::jsonb,$2)", [
             JSON.stringify(body.p_state),
             body.p_revision,
           ]);

@@ -1,6 +1,16 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ImportBackup from "./import-backup";
+import Goals from "./goals";
+import {
+  WorkTracker,
+  DailyValues,
+  FocusGoals,
+  StabilityHints,
+  PreferenceFields,
+} from "./stability";
+import { preferences, wakeTarget } from "@/lib/stability";
 import { APP_VERSION } from "@/lib/version";
 import {
   createContext,
@@ -50,7 +60,7 @@ import type {
 } from "@/lib/model";
 import { localClock, shiftDate } from "@/lib/time";
 type Save = (command: Command) => Promise<boolean>;
-type Tab = "today" | "tasks" | "history" | "settings";
+type Tab = "today" | "tasks" | "goals" | "history" | "settings";
 const Feedback = createContext("");
 
 function Modal({
@@ -118,10 +128,17 @@ function SectionTitle({
 }
 const anchorIcons = [Sun, Footprints, Coffee, Utensils, Sunset];
 
-export default function Home() {
+export default function Home({
+  initialGoalId,
+  initialTab = "today",
+}: {
+  initialGoalId?: string;
+  initialTab?: Tab;
+}) {
+  const router = useRouter();
   const [data, setData] = useState<Dashboard | null>(null);
   const dataRef = useRef<Dashboard | null>(null);
-  const [tab, setTab] = useState<Tab>("today");
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [date, setDate] = useState("");
   const dateRef = useRef("");
   const [busy, setBusy] = useState(false);
@@ -136,6 +153,7 @@ export default function Home() {
   const seq = useRef(0);
   const dirty = useRef(false);
   const receive = useCallback((value: Dashboard) => {
+    document.documentElement.dataset.theme = preferences(value.state).theme;
     dataRef.current = value;
     setData(value);
     timeOffset.current = new Date(value.serverTime).getTime() - Date.now();
@@ -277,6 +295,9 @@ export default function Home() {
       return;
     dirty.current = false;
     setTab(target);
+    router.replace(target === "today" ? "/" : `/?view=${target}`, {
+      scroll: false,
+    });
   };
   if (!data)
     return (
@@ -288,7 +309,16 @@ export default function Home() {
     );
   const s = data.state;
   const plan = s.day_plans.find((d) => d.local_date === data.date)!;
-  const entries = s.anchor_entries.filter((e) => e.local_date === data.date);
+  const focusTitle =
+    plan.focus_text || s.tasks.find((t) => t.id === plan.focus_task_id)?.title;
+  const entries = s.anchor_entries.filter(
+    (e) =>
+      e.local_date === data.date &&
+      !s.anchor_definitions.some(
+        (a) =>
+          a.id === e.anchor_id && (a.key === "coffee_rule" || a.key === "meal"),
+      ),
+  );
   const checkin = s.checkins.find((c) => c.local_date === data.date);
   const clock = localClock(now, s.profile.timezone);
   const hour = Number(clock.time.slice(0, 2));
@@ -332,7 +362,7 @@ export default function Home() {
               [
                 { id: "today", label: "Heute", icon: HomeIcon },
                 { id: "tasks", label: "Aufgaben", icon: LayoutList },
-                { id: "history", label: "Rückblick", icon: History },
+                { id: "goals", label: "Ziele", icon: Flag },
                 { id: "settings", label: "Einstellungen", icon: SettingsIcon },
               ] as const
             ).map((item) => (
@@ -357,6 +387,10 @@ export default function Home() {
             </p>
           </div>
           <div className="sidebar-bottom">
+            <button className="nav-item" onClick={() => navigate("history")}>
+              <History size={18} />
+              Rückblick
+            </button>
             <a href="/api/export" className="nav-item">
               <ArrowDownToLine size={18} />
               Daten exportieren
@@ -392,6 +426,12 @@ export default function Home() {
         </aside>
         <main className="main-content">
           <header className="topbar">
+            <button
+              className="text-button mobile-history"
+              onClick={() => navigate("history")}
+            >
+              Rückblick
+            </button>
             <span className="breadcrumb">
               Dein Raum <span>/</span>{" "}
               <strong>
@@ -399,6 +439,7 @@ export default function Home() {
                   {
                     today: "Heute",
                     tasks: "Aufgaben",
+                    goals: "Ziele",
                     history: "Rückblick",
                     settings: "Einstellungen",
                   }[tab]
@@ -467,6 +508,7 @@ export default function Home() {
                 ) : (
                   {
                     tasks: "Platz für das Wichtige.",
+                    goals: "Eine Richtung, die dir wichtig ist.",
                     history: "Ein Blick zurück.",
                     settings: "Dein eigener Rhythmus.",
                   }[tab as Exclude<Tab, "today">]
@@ -545,9 +587,9 @@ export default function Home() {
                       <Pencil size={16} />
                     </button>
                   </SectionTitle>
-                  <h2>{plan.focus_text || "Was ist heute wichtig?"}</h2>
+                  <h2>{focusTitle || "Was ist heute wichtig?"}</h2>
                   <p>
-                    {plan.focus_text
+                    {focusTitle
                       ? "Das ist dein roter Faden für heute."
                       : "Gib deinem Tag eine Richtung. Ein Satz reicht."}
                   </p>
@@ -555,7 +597,7 @@ export default function Home() {
                     className="text-button"
                     onClick={() => setDayOpen(true)}
                   >
-                    {plan.focus_text ? "Fokus anpassen" : "Fokus setzen"}
+                    {focusTitle ? "Fokus anpassen" : "Fokus setzen"}
                     <ArrowUpRight size={16} />
                   </button>
                   <div className="focus-art" aria-hidden="true">
@@ -604,12 +646,16 @@ export default function Home() {
                       diesem Tag.
                     </p>
                   )}
-                  <button className="card-link" onClick={() => setTab("tasks")}>
+                  <button
+                    className="card-link"
+                    onClick={() => navigate("tasks")}
+                  >
                     <Plus size={16} />
                     Aufgaben verwalten
                     <ArrowRight size={16} />
                   </button>
                 </section>
+                <FocusGoals state={s} />
                 <section className="card training-card">
                   <div className="training-icon">
                     <Footprints size={22} />
@@ -630,7 +676,33 @@ export default function Home() {
                   >
                     <ArrowUpRight size={20} />
                   </button>
+                  <label>
+                    Training-Status
+                    <select
+                      disabled={busy}
+                      value={plan.training_status || "open"}
+                      onChange={(e) =>
+                        save({
+                          type: "training-status",
+                          date: data.date,
+                          status: e.target.value as "open" | "planned" | "done",
+                        })
+                      }
+                    >
+                      <option value="open">offen</option>
+                      <option value="planned">geplant</option>
+                      <option value="done">erledigt</option>
+                    </select>
+                  </label>
                 </section>
+                <WorkTracker
+                  state={s}
+                  date={data.date}
+                  now={now}
+                  save={save}
+                  busy={busy}
+                />
+                <StabilityHints state={s} date={data.date} now={now} />
                 {data.activeRule && (
                   <section className="card intervention">
                     <SectionTitle
@@ -672,6 +744,13 @@ export default function Home() {
                 )}
               </div>
               <div className="column">
+                <DailyValues
+                  state={s}
+                  date={data.date}
+                  now={now}
+                  save={save}
+                  busy={busy}
+                />
                 <section className="card anchors-card">
                   <SectionTitle
                     label="DEINE STABILITÄTSANKER"
@@ -685,61 +764,74 @@ export default function Home() {
                     Kleine Dinge. Eine stabile Basis.
                   </div>
                   <div className="anchor-list">
-                    {entries.map((e) => {
-                      const a = s.anchor_definitions.find(
-                        (a) => a.id === e.anchor_id,
-                      )!;
-                      const Icon = anchorIcons[a.position] || Circle;
-                      return (
-                        <div className={`anchor-row ${e.status}`} key={e.id}>
-                          <button
-                            className="anchor-check"
-                            disabled={busy}
-                            aria-label={`${e.label_snapshot}: ${e.status === "done" ? "wieder öffnen" : "erledigen"}`}
-                            onClick={() =>
-                              save({
-                                type: "anchor",
-                                date: data.date,
-                                id: e.id,
-                                status:
-                                  e.status === "done" ? "pending" : "done",
-                                actual_local_time:
-                                  e.status === "done"
-                                    ? null
-                                    : isToday
-                                      ? clock.time
-                                      : e.actual_local_time,
-                                note: e.note,
-                              })
-                            }
-                          >
-                            {e.status === "done" ? (
-                              <Check size={17} />
-                            ) : e.status === "skipped" ? (
-                              <span>–</span>
-                            ) : (
-                              <Icon size={17} />
-                            )}
-                          </button>
-                          <button
-                            className="anchor-detail"
-                            onClick={() => setAnchor(e)}
-                          >
-                            <strong>{e.label_snapshot}</strong>
-                            <span>
-                              {e.status === "done"
-                                ? `Erledigt${e.actual_local_time ? ` · ${e.actual_local_time}` : ""}`
-                                : e.status === "skipped"
-                                  ? "Heute ausgelassen"
-                                  : a.target_time
-                                    ? `Ziel ${a.target_time}`
-                                    : "In deinem Tempo"}
-                            </span>
-                          </button>
-                          <span className={`status-dot ${e.status}`} />
-                        </div>
-                      );
-                    })}
+                    {entries
+                      .filter(
+                        (e) =>
+                          !s.anchor_definitions.some(
+                            (a) =>
+                              a.id === e.anchor_id &&
+                              (a.key === "coffee_rule" || a.key === "meal"),
+                          ),
+                      )
+                      .map((e) => {
+                        const a = s.anchor_definitions.find(
+                          (a) => a.id === e.anchor_id,
+                        )!;
+                        const Icon = anchorIcons[a.position] || Circle;
+                        const target =
+                          a.key === "wake_up"
+                            ? wakeTarget(s, data.date)
+                            : a.target_time;
+                        return (
+                          <div className={`anchor-row ${e.status}`} key={e.id}>
+                            <button
+                              className="anchor-check"
+                              disabled={busy}
+                              aria-label={`${e.label_snapshot}: ${e.status === "done" ? "wieder öffnen" : "erledigen"}`}
+                              onClick={() =>
+                                save({
+                                  type: "anchor",
+                                  date: data.date,
+                                  id: e.id,
+                                  status:
+                                    e.status === "done" ? "pending" : "done",
+                                  actual_local_time:
+                                    e.status === "done"
+                                      ? null
+                                      : isToday
+                                        ? clock.time
+                                        : e.actual_local_time,
+                                  note: e.note,
+                                })
+                              }
+                            >
+                              {e.status === "done" ? (
+                                <Check size={17} />
+                              ) : e.status === "skipped" ? (
+                                <span>–</span>
+                              ) : (
+                                <Icon size={17} />
+                              )}
+                            </button>
+                            <button
+                              className="anchor-detail"
+                              onClick={() => setAnchor(e)}
+                            >
+                              <strong>{e.label_snapshot}</strong>
+                              <span>
+                                {e.status === "done"
+                                  ? `Erledigt${e.actual_local_time ? ` · ${e.actual_local_time}` : ""}`
+                                  : e.status === "skipped"
+                                    ? "Heute ausgelassen"
+                                    : target
+                                      ? `Ziel ${target}`
+                                      : "In deinem Tempo"}
+                              </span>
+                            </button>
+                            <span className={`status-dot ${e.status}`} />
+                          </div>
+                        );
+                      })}
                   </div>
                   <div className="anchor-progress">
                     <span
@@ -808,6 +900,32 @@ export default function Home() {
               }}
             />
           )}
+          {tab === "goals" && (
+            <Goals
+              state={s}
+              date={data.date}
+              save={save}
+              busy={busy}
+              initialGoalId={initialGoalId}
+              renderTasks={(goalId) => (
+                <TaskManager
+                  state={{
+                    ...s,
+                    tasks: s.tasks.filter((t) => t.goal_id === goalId),
+                  }}
+                  date={data.date}
+                  plan={plan}
+                  save={save}
+                  busy={busy}
+                  defaultGoalId={goalId}
+                  discard={() =>
+                    !dirty.current ||
+                    window.confirm("Ungespeicherte Eingaben verwerfen?")
+                  }
+                />
+              )}
+            />
+          )}
           {tab === "settings" && (
             <SettingsForm
               key={s.profile.user_id}
@@ -870,7 +988,7 @@ export default function Home() {
                     ? "Check-in als Entwurf gespeichert."
                     : "Für diesen Tag gibt es noch keinen Check-in."}
               </p>
-              <button className="secondary" onClick={() => setTab("today")}>
+              <button className="secondary" onClick={() => navigate("today")}>
                 Tag öffnen
                 <ArrowUpRight size={16} />
               </button>
@@ -1136,6 +1254,9 @@ function CheckinForm({
         mood: score("mood"),
         stress: score("stress"),
         helped_text: String(f.get("helped")),
+        movement_done: f.has("movement_done"),
+        training_done: f.has("training_done"),
+        work_end_kept: f.has("work_end_kept"),
         tomorrow_text: String(f.get("tomorrow")),
         submit: submitter.value === "submit",
       })
@@ -1181,6 +1302,30 @@ function CheckinForm({
             maxLength={2000}
             defaultValue={checkin?.helped_text || ""}
           />
+        </label>
+        <label className="checkbox-label">
+          <input
+            name="movement_done"
+            type="checkbox"
+            defaultChecked={checkin?.movement_done || false}
+          />
+          Bewegung erledigt
+        </label>
+        <label className="checkbox-label">
+          <input
+            name="training_done"
+            type="checkbox"
+            defaultChecked={checkin?.training_done || false}
+          />
+          Training erledigt
+        </label>
+        <label className="checkbox-label">
+          <input
+            name="work_end_kept"
+            type="checkbox"
+            defaultChecked={checkin?.work_end_kept || false}
+          />
+          Feierabend eingehalten
         </label>
         <label>
           Was brauche ich morgen?
@@ -1282,6 +1427,7 @@ function TaskManager({
   save,
   busy,
   discard,
+  defaultGoalId,
 }: {
   state: State;
   date: string;
@@ -1289,6 +1435,7 @@ function TaskManager({
   save: Save;
   busy: boolean;
   discard: () => boolean;
+  defaultGoalId?: string;
 }) {
   const [edit, setEdit] = useState<Task | "new" | null>(null);
   const [deleting, setDeleting] = useState<Task | null>(null);
@@ -1328,6 +1475,7 @@ function TaskManager({
       title: String(f.get("title")),
       notes: String(f.get("notes")),
       due_date: String(f.get("due")) || null,
+      goal_id: String(f.get("goal")) || null,
     };
     const command: Command =
       edit === "new"
@@ -1397,6 +1545,22 @@ function TaskManager({
                   name="due"
                   defaultValue={edit === "new" ? date : edit.due_date || ""}
                 />
+              </label>
+              <label>
+                Zugehöriges Ziel · optional
+                <select
+                  name="goal"
+                  defaultValue={
+                    edit === "new" ? defaultGoalId || "" : edit.goal_id || ""
+                  }
+                >
+                  <option value="">Kein Ziel</option>
+                  {state.goals.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.title}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label>
                 Notiz
@@ -1482,6 +1646,21 @@ function SettingsForm({
       work_end_target: String(f.get("end")),
       movement_time: String(f.get("movement")),
       checkin_time: String(f.get("checkin")),
+      preferences: {
+        wake_weekday: String(f.get("wake_weekday")),
+        wake_weekend: String(f.get("wake_weekend")),
+        coffee_cutoff: String(f.get("coffee_cutoff")),
+        coffee_limit: Number(f.get("coffee_limit")),
+        focus_minutes: Number(f.get("focus_minutes")),
+        break_minutes: Number(f.get("break_minutes")),
+        calories_target: Number(f.get("calories_target")),
+        protein_target: f.get("protein_target")
+          ? Number(f.get("protein_target"))
+          : null,
+        theme: String(f.get("theme")) as "dark" | "light" | "system",
+        coffee_rule: f.has("coffee_rule"),
+        work_rule: f.has("work_rule"),
+      },
       rules: {
         wake_up_late: f.has("wake_up_late"),
         movement_missing: f.has("movement_missing"),
@@ -1492,9 +1671,11 @@ function SettingsForm({
         enabled: f.has(`enabled-${a.id}`),
         description: String(f.get(`description-${a.id}`)),
         target_time:
-          a.key === "work_end"
-            ? String(f.get("end"))
-            : String(f.get(`target-${a.id}`)) || null,
+          a.key === "wake_up"
+            ? String(f.get("wake_weekday"))
+            : a.key === "work_end"
+              ? String(f.get("end"))
+              : String(f.get(`target-${a.id}`)) || null,
       })),
     });
   }
@@ -1535,6 +1716,7 @@ function SettingsForm({
           </div>
         </section>
         <section className="card">
+          <PreferenceFields settings={preferences(state)} />
           <SectionTitle label="DEIN TAGESRHYTHMUS" icon={<Sun size={16} />} />
           <p className="muted small">
             Startvorschläge: Passe die Zeiten an deinen Alltag an. Hinweise
@@ -1616,7 +1798,12 @@ function SettingsForm({
                   defaultValue={a.description}
                 />
               </label>
-              {a.key === "work_end" ? (
+              {a.key === "wake_up" ? (
+                <p className="small muted">
+                  Aufstehzeiten für Werktage und Wochenende stehen oben unter
+                  „Deine Stabilität“.
+                </p>
+              ) : a.key === "work_end" ? (
                 <p className="small muted">
                   Die Zielzeit wird oben unter „Feierabendziel“ festgelegt.
                 </p>

@@ -1,6 +1,19 @@
-# Luki Home 0.1.1
+# Luki Home 0.2.0
 
-Persönliche Web-App für Fokus, Aufgaben, Stabilitätsanker und Abend-Check-in. Next.js/React/TypeScript, lokaler SQLite-Betrieb oder Supabase Auth/PostgreSQL für Online-Betrieb. Die Projektdateien unter `../sources/` werden nicht verwendet oder verändert. Eine Online-Veröffentlichung ist noch nicht erfolgt.
+Persönliche Web-App für Ziele, Aufgaben, Stabilität und Abend-Check-in. Next.js/React/TypeScript, lokaler SQLite-Betrieb oder Supabase Auth/PostgreSQL für Online-Betrieb. Production: [luki-home.vercel.app](https://luki-home.vercel.app). Die Projektdateien unter `../sources/` werden nicht verwendet oder verändert.
+
+## Neu in 0.2
+
+- Ziele mit Warum, Erfolgskriterium, sechs Kategorien, Priorität, Status, Zeitraum und optionalem Fokus. Mehr als fünf Fokus-Ziele erzeugen einen Hinweis, keine Sperre.
+- Eigene Zielseiten unter `/goals/[id]`, sortierbare Meilensteine und zugehörige Aufgaben. Der nächste Schritt wird aus offenen Aufgaben abgeleitet.
+- Kaffeezähler mit Uhrzeiten, letztem Kaffee, Tageslimit und Cutoff. Standard: 3 / 13:00; ein Hinweis verhindert keine ehrliche Erfassung.
+- Fokus-/Pausen-Tracker mit 75 / 15 Minuten als Startwert. Serverzeit, gespeicherte Zeitstempel und kumulierte Fokuszeit überstehen Pause, Seitenwechsel, Reload und Tageswechsel. Zu lange Fokusblöcke erzeugen einen direkten Pausenhinweis.
+- Manuelle Tageswerte für Kalorien, optional Protein und Bewegung; Quellen `manual`, `health`, `external`. Keine Mahlzeiten- oder Lebensmitteldatenbank. Der API-Befehl `metric` kann einen externen Tageswert annehmen; eine externe Integration ist nicht enthalten.
+- Training als Tagesstatus offen/geplant/erledigt und freie Notiz. Keine automatische Wochenplanung, Übungen oder Progression.
+- Einstellungen für Werktags-/Wochenend-Aufstehen, Kaffee, Fokus/Pause, Feierabend, Nährstoffziele und Theme; deaktivierbare Hinweise.
+- Erweiterter Check-in mit Bewegung, Training und Feierabend; Dashboard mit Fokus-Zielen und Stabilitätswerten.
+
+Migration, Kompatibilität, Abnahme und Rückweg: [UPDATE-0.2.md](docs/UPDATE-0.2.md).
 
 ## Start auf diesem Rechner
 
@@ -35,7 +48,7 @@ Entwicklung: `pnpm dev`. Änderungen am Code brauchen vor dem nächsten Produkti
 - Supabase-Adapter mit eigener Sitzung, persönlicher E-Mail-Freigabe, atomarer Speicherung und Konflikterkennung.
 - Einmalige Übernahme eines ZIP-Exports in einen noch leeren Online-Zugang.
 
-Die Uhrzeiten 08:00 / 14:00 / 17:00 / 20:30 sind Startwerte und in den Einstellungen veränderbar. Hinweise erscheinen während der sichtbaren App-Nutzung, nicht als Push-Mitteilung bei geschlossenem Browser. Training ist eine freie Tagesnotiz. Trainingstracking, Ziele, Musteranalyse und zusammenführende/überschreibende Importe sind spätere Ausbaustufen.
+Die Uhrzeiten 08:00 / 09:00 (Wochenende) / 14:00 / 17:00 / 20:30 sind veränderbare Startwerte. Hinweise erscheinen während der sichtbaren App-Nutzung; kein Push bei geschlossenem Browser. Ein Pausenende nach mindestens der geplanten Dauer zählt als eingehalten; mehr als fünf zusätzliche Minuten zählen als überzogen. Der Fokus-Hinweis wird nach 15 zusätzlichen Minuten direkter. Ein Timer kann Bildschirmzeit anzeigen, aber tatsächliches Verlassen des Bildschirms nicht feststellen. Zusammenführende oder überschreibende Importe sind nicht enthalten.
 
 Konfigurationen beeinflussen neue Tages-Snapshots. Deaktivierte Anker bleiben im bereits begonnenen Tag sichtbar, erzeugen aber keine weiteren Hinweise. Zeitzone, Hinweiszeiten und Regel-Schalter gelten sofort. Während offene Formulare bearbeitet werden, wird der Tagesinhalt nicht im Hintergrund ausgetauscht. Nach einem Tagwechsel wird „Heute“ beim nächsten Laden/Aktualisieren geöffnet, sofern kein historisches Datum ausgewählt ist.
 
@@ -43,13 +56,13 @@ Konfigurationen beeinflussen neue Tages-Snapshots. Deaktivierte Anker bleiben im
 
 Ohne zusätzliche Konfiguration funktioniert der lokale Betrieb. Optional `.env.example` nach `.env.local` kopieren. `LUKI_DB_PATH` legt einen anderen Datenbankpfad fest. Standard: `data/luki-home.sqlite`, mit zugehörigen WAL-Dateien. Diese Dateien sind vom Git-Tracking ausgeschlossen. Die Daten liegen serverseitig auf diesem Rechner, nicht in Browser-LocalStorage. Das Betriebssystemkonto hat Zugriff auf die Datenbankdateien; SQLite selbst ist nicht verschlüsselt.
 
-SQLite verwendet hier ein versioniertes JSON-Dokument je Konto, das in einer Transaktion geändert wird. Validierung und Domänenregeln sichern Beziehungen und Eingaben. Revisionen verhindern, dass ein alter Browserstand neuere Eingaben überschreibt. Mit `LUKI_STORAGE=supabase` arbeitet derselbe Core mit relationalen PostgreSQL-Tabellen im separaten Schema `luki_home`. Der Cloud-Adapter ist implementiert, aber noch nicht mit einem echten Projekt verbunden. Auf Vercel ist der lokale SQLite-Modus gesperrt; fehlende Online-Konfiguration führt nicht zu einer Ersatzspeicherung auf flüchtigem Server-Dateisystem.
+SQLite verwendet ein versioniertes JSON-Dokument je Konto; neue Felder werden beim Lesen additiv ergänzt. Änderungen werden transaktional gespeichert. Revisionen verhindern Überschreiben aus alten Browserständen. Mit `LUKI_STORAGE=supabase` arbeitet derselbe Core mit relationalen PostgreSQL-Tabellen im separaten Schema `luki_home` und Supabase Auth. Auf Vercel ist der lokale SQLite-Modus gesperrt; fehlende Cloud-Konfiguration führt nicht zu einer Ersatzspeicherung auf flüchtigem Dateisystem.
 
 Der Login verwendet gesalzene scrypt-Passworthashes und zufällige serverseitige Sitzungen mit sieben Tagen Laufzeit. Cookies sind HttpOnly/SameSite=Strict, und Schreibaufrufe prüfen den Origin. Zugriffsprüfungen erfolgen auf jedem privaten API-Endpunkt. Der lokale Modus lehnt öffentliche Hostnamen ab; für spätere Veröffentlichung ist Supabase Auth statt lokaler Anmeldung vorgesehen.
 
 ## Export
 
-In der Seitenleiste oder den Einstellungen „Daten exportieren“ wählen. Die ZIP-Datei enthält Profil, Einstellungen, Aufgaben, Tagespläne, Prioritäten, Ankerdefinitionen, Tagesanker, Check-ins, Regelereignisse und ein Manifest mit Anzahl je Datei und Formatversion. Zugangsdaten werden nicht exportiert. Im Online-Modus kann dieser Export in den Einstellungen einmalig in einen leeren Zugang übernommen werden. Alle Beziehungen bleiben erhalten; Nutzer-IDs werden dem verifizierten Online-Konto zugeordnet. Ein Zugang mit eigenen Tagesdaten wird nicht überschrieben. Der Export ersetzt nicht das folgende Systembackup.
+In der Seitenleiste oder den Einstellungen „Daten exportieren“ wählen. Das ZIP enthält Profil, Einstellungen, Aufgaben, Kategorien, Ziele, Meilensteine, Kaffeeeinträge, Work-Sessions, Daily Metrics, Tagespläne, Prioritäten, Anker, Check-ins und Regelereignisse sowie ein Manifest mit Formatversion 2 und Datensatzanzahlen. Keine Auth-Sitzungen, Passwörter oder Schlüssel. Die Work-Sessions enthalten nur Fokus-/Pausendaten. Im Online-Modus ist ein einmaliger Import in einen leeren Zugang möglich; Beziehungen bleiben erhalten und Nutzer-IDs werden dem bestätigten Konto zugeordnet. Auch alte Format-1-Exporte werden gelesen. Bestehende Daten werden nicht überschrieben. Der Export ersetzt kein Systembackup.
 
 ## Backup und Restore
 

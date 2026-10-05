@@ -3,6 +3,7 @@ import { storageMode } from "./config";
 import { supabase } from "./supabase";
 import { HttpError } from "./auth";
 import type { State } from "./model";
+import { upgradeState } from "./stability";
 function cloudError(error: { code?: string; message: string }) {
   if (error.code === "40001")
     throw new HttpError(
@@ -18,12 +19,14 @@ function cloudError(error: { code?: string; message: string }) {
 export async function readState(userId: string): Promise<State> {
   if (storageMode() === "local")
     return (await import("./db")).readState(userId);
-  const { data, error } = await (await supabase()).rpc("luki_home_get_state");
+  const { data, error } = await (
+    await supabase()
+  ).rpc("luki_home_get_state_v2");
   if (error) cloudError(error);
   const state = data as State;
   if (!state || state.profile.user_id !== userId)
     throw new HttpError(403, "Ungültige Profilzuordnung.");
-  return state;
+  return upgradeState(state);
 }
 export async function updateState<T>(
   userId: string,
@@ -40,7 +43,7 @@ export async function updateState<T>(
     if (JSON.stringify(state) === before) return { state, result };
     const { error } = await (
       await supabase()
-    ).rpc("luki_home_save_state", { p_state: state, p_revision: revision });
+    ).rpc("luki_home_save_state_v2", { p_state: state, p_revision: revision });
     if (error) {
       if (error.code === "40001" && retryRead && attempt < 2) continue;
       cloudError(error);

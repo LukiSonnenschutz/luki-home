@@ -5,8 +5,11 @@ import {
   type RuleId,
 } from "./model";
 import { localClock } from "./time";
+import { upgradeState, wakeTarget } from "./stability";
+import { applyStabilityCommand } from "./stability-commands";
 
 export function ensureDay(s: State, date: string) {
+  upgradeState(s);
   const uid = s.profile.user_id;
   let plan = s.day_plans.find((d) => d.local_date === date);
   if (!plan) {
@@ -56,14 +59,14 @@ export const ruleDefinitions: {
     key: "morning_movement",
     priority: 30,
     message:
-      "Deine Bewegung ist heute noch offen. Passt jetzt eine kurze Bewegungspause?",
+      "Du warst heute noch nicht wirklich in Bewegung. 20–30 Minuten Fahrrad oder Spaziergang reichen.",
   },
   {
     id: "work_end_due",
     key: "work_end",
     priority: 10,
     message:
-      "Zeit für deinen Feierabend. Sichere deine Arbeit und wähle einen Abschluss für heute.",
+      "Dein Arbeitstag sollte jetzt enden. Offene Aufgaben können morgen weitergehen.",
   },
 ];
 
@@ -84,7 +87,7 @@ export function evaluateRules(
       );
     const target =
       r.id === "wake_up_late"
-        ? a?.target_time
+        ? wakeTarget(s, date)
         : r.id === "movement_missing"
           ? s.settings.movement_time
           : s.settings.work_end_target;
@@ -94,6 +97,16 @@ export function evaluateRules(
       !e ||
       e.status !== "pending" ||
       !target
+    )
+      continue;
+    if (
+      r.id === "movement_missing" &&
+      s.daily_metrics.some(
+        (m) =>
+          m.date === date &&
+          m.metric_type === "movement_minutes" &&
+          m.value > 0,
+      )
     )
       continue;
     if (r.id === "wake_up_late" ? clock.time <= target : clock.time < target)
@@ -134,6 +147,13 @@ export function evaluateRules(
 export function applyCommand(s: State, c: Command, now: Date) {
   const stamp = now.toISOString();
   const plan = ensureDay(s, c.date);
+  if (applyStabilityCommand(s, c, now)) return;
+  if (
+    (c.type === "task-create" || c.type === "task-edit") &&
+    c.goal_id &&
+    !s.goals.some((g) => g.id === c.goal_id)
+  )
+    throw new Error("Ziel nicht gefunden.");
   const task = (id: string) => {
     const t = s.tasks.find((t) => t.id === id);
     if (!t) throw new Error("Aufgabe nicht gefunden.");
@@ -151,6 +171,7 @@ export function applyCommand(s: State, c: Command, now: Date) {
       break;
     case "task-create":
       s.tasks.push({
+        goal_id: c.goal_id || null,
         id: crypto.randomUUID(),
         user_id: s.profile.user_id,
         title: c.title,
@@ -164,6 +185,8 @@ export function applyCommand(s: State, c: Command, now: Date) {
       break;
     case "task-edit":
       Object.assign(task(c.id), {
+        goal_id:
+          c.goal_id === undefined ? task(c.id).goal_id || null : c.goal_id,
         title: c.title,
         notes: c.notes,
         due_date: c.due_date,
@@ -232,6 +255,9 @@ export function applyCommand(s: State, c: Command, now: Date) {
         s.checkins.push(e);
       }
       Object.assign(e, {
+        movement_done: c.movement_done ?? e.movement_done ?? false,
+        training_done: c.training_done ?? e.training_done ?? false,
+        work_end_kept: c.work_end_kept ?? e.work_end_kept ?? false,
         energy: c.energy,
         mood: c.mood,
         stress: c.stress,
@@ -265,6 +291,7 @@ export function applyCommand(s: State, c: Command, now: Date) {
         timezone: c.timezone,
       });
       Object.assign(s.settings, {
+        preferences: c.preferences || s.settings.preferences,
         work_end_target: c.work_end_target,
         movement_time: c.movement_time,
         checkin_time: c.checkin_time,

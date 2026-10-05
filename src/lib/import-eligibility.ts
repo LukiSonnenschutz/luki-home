@@ -1,6 +1,11 @@
 import type { State } from "./model";
 export function isEmptyForImport(s: State) {
   return (
+    !s.goals?.length &&
+    !s.goal_milestones?.length &&
+    !s.coffee_entries?.length &&
+    !s.work_sessions?.length &&
+    !s.daily_metrics?.length &&
     s.tasks.length === 0 &&
     s.checkins.length === 0 &&
     s.day_plans.every(

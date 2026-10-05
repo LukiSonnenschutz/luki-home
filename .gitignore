@@ -8,3 +8,4 @@ test-results/
 test-results-cloud/
 playwright-report/
 *.tsbuildinfo
+supabase/.temp/
