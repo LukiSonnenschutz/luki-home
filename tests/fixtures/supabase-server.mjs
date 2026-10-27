@@ -161,7 +161,7 @@ createServer(async (req, res) => {
           metrics.writes++;
           if (forcedConflicts > 0) {
             forcedConflicts--;
-            send(409, { code: "40001", message: "Revision conflict" });
+            send(409, { code: "PT409", message: "Revision conflict" });
             return;
           }
           await db.query(
@@ -173,7 +173,7 @@ createServer(async (req, res) => {
         }
         send(404, { code: "PGRST202", message: "Function not found" });
       } catch (e) {
-        send(e.code === "40001" ? 409 : 400, {
+        send(["PT409", "40001"].includes(e.code) ? 409 : 400, {
           code: e.code,
           message: e.message,
         });

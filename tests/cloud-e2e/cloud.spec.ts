@@ -15,7 +15,7 @@ test("Cloud-Vertrag: privater Login, ZIP-Übernahme, Speicherung und Abmeldung",
     .fill("cloud-fixture-password-2026");
   await page.getByRole("button", { name: "Anmelden", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Lukas/ })).toBeVisible();
-  await expect(page.getByText("Online · v0.3.1")).toBeVisible();
+  await expect(page.getByText("Online · v0.3.2")).toBeVisible();
   const cookies = await context.cookies();
   expect(
     cookies.some((c) => c.name.startsWith("luki-home-auth") && c.httpOnly),

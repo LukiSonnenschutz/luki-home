@@ -5,7 +5,7 @@ import { HttpError } from "./auth";
 import type { State } from "./model";
 import { upgradeState } from "./stability";
 function cloudError(error: { code?: string; message: string }) {
-  if (error.code === "40001")
+  if (["PT409", "40001"].includes(error.code || ""))
     throw new HttpError(
       409,
       "Die Daten wurden inzwischen geändert. Bitte den aktuellen Stand prüfen und erneut speichern.",
