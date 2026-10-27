@@ -18,7 +18,7 @@ test("0.3 PostgreSQL: Migration, v3-Roundtrip, zwei Owner, Anon-Sperre, Import, 
     );
     const folder = new URL("../supabase/migrations/", import.meta.url),
       files = (await readdir(folder)).sort();
-    for (const name of files.filter((n) => !n.includes("v03")))
+    for (const name of files.filter((n) => n < "20261005121256"))
       await db.exec(await readFile(new URL(name, folder), "utf8"));
     await db.exec(`set role authenticated;set app.uid='${a}';`);
     const load = async (v = 3) =>

@@ -58,9 +58,15 @@ test("GET never saves; an expired timer with permanent 409 stops instead of retr
   await page.clock.fastForward(10 * 60_000);
   expect(await (await request.get(fixture)).json()).toEqual(failed);
   await control(request, { conflicts: 0 });
+  const synchronized = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/state") &&
+      response.request().method() === "POST",
+  );
   await page
     .getByRole("button", { name: "Aktuellen Stand laden", exact: true })
     .click();
+  expect((await synchronized).status()).toBe(200);
   await expect(
     page.getByRole("status").filter({ hasText: "Fokusblock beendet" }),
   ).toBeVisible();

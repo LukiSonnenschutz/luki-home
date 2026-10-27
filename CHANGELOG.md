@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2 — 2026-10-27 — Konfliktcode in Supabase korrigieren
+
+- Versionskonflikte der drei bestehenden Speicher-RPCs verwenden `PT409` statt `40001`, damit PostgREST 14 keine Endlosschleife startet.
+- Additive Funktionsmigration erhält Daten, Berechtigungen und alle bestehenden Prüfungen. Client behandelt beide Konfliktcodes als HTTP 409.
+- 29 Fach-/Datenbanktests, inklusive idempotenter Migration, unveränderter ACL und unveränderter Daten bei Konflikten. Cloud-Fehlertests verwenden den tatsächlichen `PT409`-Vertrag.
+
 ## 0.3.1 — 2026-10-27 — Speicherschleife beheben
 
 - Tagesabrufe speichern keine Snapshots mehr; notwendige Synchronisierung erfolgt einmalig und revisionsgeprüft.

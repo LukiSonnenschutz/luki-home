@@ -17,9 +17,7 @@ test("0.1→0.2 Migration, RPC-Roundtrip, alter Client, Owner-RLS und atomarer K
     );
     const folder = new URL("../supabase/migrations/", import.meta.url),
       files = (await readdir(folder)).sort();
-    for (const name of files.filter(
-      (n) => !n.includes("v02") && !n.includes("v03"),
-    ))
+    for (const name of files.filter((n) => n.startsWith("20261004")))
       await db.exec(await readFile(new URL(name, folder), "utf8"));
     await db.exec(`set role authenticated;set app.uid='${a}';`);
     const load = async (version = 2) =>
