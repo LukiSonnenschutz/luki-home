@@ -27,6 +27,8 @@ const user = {
 const sessions = new Map();
 const refreshes = new Map();
 let queue = Promise.resolve();
+let forcedConflicts = 0;
+const metrics = { reads: 0, writes: 0 };
 const issue = () => {
   const header = Buffer.from(
     JSON.stringify({ alg: "HS256", typ: "JWT" }),
@@ -79,6 +81,22 @@ createServer(async (req, res) => {
     return;
   }
   const token = req.headers.authorization?.replace(/^Bearer /, "");
+  // Test-only control plane, bound to 127.0.0.1; never shipped as an app route.
+  if (url.pathname === "/__test/control") {
+    if (req.method === "POST") {
+      if (body.reset) {
+        metrics.reads = 0;
+        metrics.writes = 0;
+      }
+      if (typeof body.conflicts === "number") forcedConflicts = body.conflicts;
+      if (body.expireFocus)
+        await db.exec(
+          "update luki_home.work_sessions set focus_started_at=now()-interval '2 hours' where status='active'",
+        );
+    }
+    send(200, metrics);
+    return;
+  }
   const current = sessions.get(token);
   if (url.pathname === "/auth/v1/token") {
     if (
@@ -132,6 +150,7 @@ createServer(async (req, res) => {
       await db.query("select set_config('app.uid',$1,false)", [current.id]);
       try {
         if (url.pathname.endsWith("/luki_home_get_state_v3")) {
+          metrics.reads++;
           const r = await db.query(
             "select public.luki_home_get_state_v3() as state",
           );
@@ -139,6 +158,12 @@ createServer(async (req, res) => {
           return;
         }
         if (url.pathname.endsWith("/luki_home_save_state_v3")) {
+          metrics.writes++;
+          if (forcedConflicts > 0) {
+            forcedConflicts--;
+            send(409, { code: "40001", message: "Revision conflict" });
+            return;
+          }
           await db.query(
             "select public.luki_home_save_state_v3($1::jsonb,$2)",
             [JSON.stringify(body.p_state), body.p_revision],

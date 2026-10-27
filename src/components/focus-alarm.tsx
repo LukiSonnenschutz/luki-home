@@ -16,7 +16,7 @@ export default function FocusAlarm({
     [played, setPlayed] = useState(""),
     [dismissed, setDismissed] = useState(""),
     handled = useRef(new Set<string>()),
-    refreshing = useRef<string | null>(null);
+    requested = useRef(new Set<string>());
   const p = preferences(state),
     running = state.work_sessions.find((w) => w.status === "active"),
     latest = [...state.work_sessions].sort((a, b) =>
@@ -45,10 +45,13 @@ export default function FocusAlarm({
   useEffect(() => {
     if (!running) return;
     const remaining = plannedSeconds(running) - focusSeconds(running, now);
-    if (remaining > 0 || refreshing.current === running.id) return;
-    refreshing.current = running.id;
-    void refresh().finally(() => {
-      refreshing.current = null;
+    const key = `${running.id}:${running.focus_started_at}:${plannedSeconds(running)}:${running.elapsed_seconds}`;
+    if (remaining > 0 || requested.current.has(key)) return;
+    // Mark BEFORE starting the request, and retain the marker on errors/conflicts.
+    // A one-second render tick or a new callback must never replay this write.
+    requested.current.add(key);
+    void refresh().catch(() => {
+      /* The dashboard displays the load error. */
     });
   }, [running, now, refresh]);
   useEffect(() => {

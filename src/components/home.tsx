@@ -155,6 +155,8 @@ export default function Home({
   const [anchor, setAnchor] = useState<AnchorEntry | null>(null);
   const seq = useRef(0);
   const dirty = useRef(false);
+  const loading = useRef(false);
+  const backgroundBlocked = useRef(false);
   const receive = useCallback((value: Dashboard) => {
     document.documentElement.dataset.theme = preferences(value.state).theme;
     dataRef.current = value;
@@ -163,25 +165,84 @@ export default function Home({
     setNow(new Date(Date.now() + timeOffset.current));
   }, []);
   const load = useCallback(
-    async (selected = dateRef.current, quiet = false) => {
+    async function loadDashboard(
+      selected = dateRef.current,
+      quiet = false,
+      readOnly = false,
+    ): Promise<void> {
+      if (
+        loading.current ||
+        busyRef.current ||
+        (quiet && backgroundBlocked.current)
+      )
+        return;
+      loading.current = true;
+      const selection = dateRef.current;
       const ticket = ++seq.current;
+      const url = `/api/state${selected ? `?date=${selected}` : ""}`;
       try {
-        const r = await fetch(
-          `/api/state${selected ? `?date=${selected}` : ""}`,
-          { cache: "no-store" },
-        );
+        const r = await fetch(url, {
+          cache: "no-store",
+          signal: AbortSignal.timeout(15_000),
+        });
         if (r.status === 401) {
           window.location.assign(
             new URL("/login", window.location.origin).href,
           );
           return;
         }
-        const value = await r.json();
+        let value = await r.json();
         if (!r.ok) throw new Error(value.error);
+        if (value.needsSync && !readOnly) {
+          // Initialization/timer expiry is an explicit, single mutation, never a GET side effect.
+          const sync = await fetch("/api/state", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "synchronize",
+              date: value.date,
+              revision: value.state.revision,
+            }),
+            signal: AbortSignal.timeout(15_000),
+          });
+          const result = await sync.json();
+          if (!sync.ok) {
+            if (sync.status === 409) {
+              // Read the winner once. Never replay a failed write automatically.
+              const latest = await fetch(url, {
+                cache: "no-store",
+                signal: AbortSignal.timeout(15_000),
+              });
+              const current = await latest.json();
+              if (
+                latest.ok &&
+                !current.needsSync &&
+                ticket === seq.current &&
+                !busyRef.current
+              )
+                receive(current);
+            }
+            throw new Error(result.error || "Aktualisierung fehlgeschlagen.");
+          }
+          value = result;
+        }
+        if (value.needsSync)
+          throw new Error(
+            "Der Tagesstand muss zuerst aktualisiert werden. Bitte den aktuellen Stand laden.",
+          );
         if (ticket === seq.current && !busyRef.current) receive(value);
+        if (!quiet && !readOnly) {
+          backgroundBlocked.current = false;
+          setError("");
+        }
       } catch (e) {
-        if (!quiet || !dataRef.current)
-          setError(e instanceof Error ? e.message : "Laden fehlgeschlagen.");
+        backgroundBlocked.current = true;
+        setError(
+          `${e instanceof Error ? e.message : "Laden fehlgeschlagen."} Automatische Aktualisierung pausiert. Bitte den aktuellen Stand laden.`,
+        );
+      } finally {
+        loading.current = false;
+        if (selection !== dateRef.current) void loadDashboard(dateRef.current);
       }
     },
     [receive],
@@ -221,7 +282,7 @@ export default function Home({
     return () => window.removeEventListener("beforeunload", handler);
   }, []);
   const save: Save = async (command) => {
-    if (busyRef.current || !dataRef.current) return false;
+    if (busyRef.current || loading.current || !dataRef.current) return false;
     busyRef.current = true;
     setBusy(true);
     setError("");
@@ -243,18 +304,21 @@ export default function Home({
       const value = await r.json();
       if (!r.ok) {
         if (r.status === 409) {
+          backgroundBlocked.current = true;
           busyRef.current = false;
-          await load(dateRef.current);
+          await load(dateRef.current, false, true);
         }
         throw new Error(value.error);
       }
       receive(value);
       setSaved("Gespeichert");
       dirty.current = false;
+      backgroundBlocked.current = false;
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Speichern fehlgeschlagen.");
       dirty.current = true;
+      backgroundBlocked.current = true;
       return false;
     } finally {
       busyRef.current = false;
@@ -495,6 +559,13 @@ export default function Home({
           {error && (
             <div className="error-banner" role="alert">
               {error}
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={() => void load(dateRef.current)}
+              >
+                Aktuellen Stand laden
+              </button>
               <button
                 className="icon-button"
                 onClick={() => setError("")}

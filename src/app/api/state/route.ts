@@ -4,7 +4,8 @@ import { readState, updateState } from "@/lib/storage";
 import { storageMode } from "@/lib/config";
 import { dateSchema, commandSchema } from "@/lib/model";
 import { localClock } from "@/lib/time";
-import { applyCommand, ensureDay, evaluateRules } from "@/lib/domain";
+import { applyCommand, evaluateRules } from "@/lib/domain";
+import { projectDashboard } from "@/lib/dashboard";
 import { body, errorResponse } from "@/lib/http";
 import { expireWork } from "@/lib/stability";
 export const runtime = "nodejs";
@@ -13,27 +14,25 @@ export async function GET(request: Request) {
   try {
     const uid = await requireUser(request);
     const now = new Date();
-    const today = localClock(now, (await readState(uid)).profile.timezone).date;
+    const stored = await readState(uid);
+    const today = localClock(now, stored.profile.timezone).date;
     const date = dateSchema.parse(
       new URL(request.url).searchParams.get("date") || today,
     );
     if (date > today)
       throw new HttpError(400, "Zukünftige Tage werden noch nicht geöffnet.");
-    const { state, result } = await updateState(
-      uid,
-      (s) => {
-        ensureDay(s, date);
-        expireWork(s, now);
-        return evaluateRules(s, date, now);
-      },
-      true,
+    const { state, activeRule, needsSync } = projectDashboard(
+      stored,
+      date,
+      now,
     );
     return NextResponse.json({
       state,
       date,
       today,
       serverTime: now.toISOString(),
-      activeRule: result,
+      activeRule,
+      needsSync,
       mode: storageMode(),
     });
   } catch (e) {

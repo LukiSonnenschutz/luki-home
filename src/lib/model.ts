@@ -125,6 +125,7 @@ export interface State extends TrainingState {
   intervention_events: Intervention[];
 }
 export interface Dashboard {
+  needsSync?: boolean;
   state: State;
   date: string;
   today: string;
@@ -158,6 +159,7 @@ const goalFields = {
   target_date: dateSchema.nullable(),
 };
 export const commandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("synchronize"), ...base }),
   ...trainingCommandSchemas,
   z
     .object({
