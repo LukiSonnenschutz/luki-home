@@ -1,6 +1,10 @@
-# Luki Home 0.3.0
+# Luki Home 0.3.1
 
 Persönliche Web-App für Ziele, Aufgaben, Stabilität und Abend-Check-in. Next.js/React/TypeScript, lokaler SQLite-Betrieb oder Supabase Auth/PostgreSQL für Online-Betrieb. Production: [luki-home.vercel.app](https://luki-home.vercel.app). Die Projektdateien unter `../sources/` werden nicht verwendet oder verändert.
+
+## Störungsbehebung 0.3.1
+
+Begrenzt automatische Synchronisierung und verhindert wiederholte Timer-Speicherversuche bei Konflikten. Bei einem Fehler bleiben Eingaben erhalten; der aktuelle Stand lässt sich bewusst neu laden. Details und Prüfung: [HOTFIX-0.3.1.md](docs/HOTFIX-0.3.1.md).
 
 ## Neu in 0.3
 

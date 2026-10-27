@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 — 2026-10-27 — Speicherschleife beheben
+
+- Tagesabrufe speichern keine Snapshots mehr; notwendige Synchronisierung erfolgt einmalig und revisionsgeprüft.
+- Abgelaufene Timer wiederholen fehlgeschlagene Aktualisierungen nicht bei jedem Sekundentick.
+- Konflikte pausieren automatische Aktualisierung; Entwürfe bleiben für bewusstes erneutes Speichern erhalten.
+- Keine Datenmigration. Prüfungen und Betrieb: [HOTFIX-0.3.1.md](docs/HOTFIX-0.3.1.md).
+
 ## 0.2.0 — 2026-10-05 — Ziele & Stabilität
 
 - Zielübersicht und eigene Detailseiten, Fokus-Ziele, Statuswechsel, Meilensteine mit Reihenfolge; Aufgaben optional mit einem Ziel verbunden.

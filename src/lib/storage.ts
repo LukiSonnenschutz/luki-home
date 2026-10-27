@@ -31,25 +31,20 @@ export async function readState(userId: string): Promise<State> {
 export async function updateState<T>(
   userId: string,
   fn: (state: State) => T,
-  retryRead = false,
 ): Promise<{ state: State; result: T }> {
   if (storageMode() === "local")
     return (await import("./db")).updateState(userId, fn);
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const state = await readState(userId);
-    const before = JSON.stringify(state);
-    const revision = state.revision;
-    const result = fn(state);
-    if (JSON.stringify(state) === before) return { state, result };
-    const { error } = await (
-      await supabase()
-    ).rpc("luki_home_save_state_v3", { p_state: state, p_revision: revision });
-    if (error) {
-      if (error.code === "40001" && retryRead && attempt < 2) continue;
-      cloudError(error);
-    }
-    state.revision = revision + 1;
-    return { state, result };
+  const state = await readState(userId);
+  const before = JSON.stringify(state);
+  const revision = state.revision;
+  const result = fn(state);
+  if (JSON.stringify(state) === before) return { state, result };
+  const { error } = await (
+    await supabase()
+  ).rpc("luki_home_save_state_v3", { p_state: state, p_revision: revision });
+  if (error) {
+    cloudError(error);
   }
-  throw new HttpError(409, "Bitte erneut laden.");
+  state.revision = revision + 1;
+  return { state, result };
 }

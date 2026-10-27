@@ -162,6 +162,8 @@ export function applyCommand(s: State, c: Command, now: Date) {
     return t;
   };
   switch (c.type) {
+    case "synchronize":
+      break;
     case "day":
       if (c.focus_task_id) task(c.focus_task_id);
       Object.assign(plan, {
